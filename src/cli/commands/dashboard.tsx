@@ -5,6 +5,7 @@ import { loadConfig } from '../../config/parser.js';
 import { ProcessManager } from '../../processes/manager.js';
 import { ModuleOrchestrator } from '../../modules/index.js';
 import { DockerExecutor } from '../../modules/docker.js';
+import { getSystemResources, getProcessResources, createBar, formatMemory, formatCPU, type SystemResources } from '../../utils/resources.js';
 
 interface ModuleStatus {
   name: string;
@@ -12,6 +13,8 @@ interface ModuleStatus {
   status: 'RUNNING' | 'STOPPED' | 'STARTING' | 'STOPPING' | 'ERROR';
   pid?: number;
   uptime?: number;
+  cpu?: number;
+  memory?: number;
   containers?: Array<{
     name: string;
     status: string;
@@ -29,6 +32,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [systemResources, setSystemResources] = useState<SystemResources>(() => getSystemResources());
   
   const [processManager] = useState(() => new ProcessManager());
   const [orchestrator] = useState(() => new ModuleOrchestrator(processManager));
@@ -59,6 +63,15 @@ const Dashboard: React.FC = () => {
           status: status as any || 'STOPPED',
           pid,
         };
+
+        // Get process resources if we have a PID
+        if (pid) {
+          const resources = getProcessResources(pid);
+          if (resources) {
+            moduleStatus.cpu = resources.cpu;
+            moduleStatus.memory = resources.memory;
+          }
+        }
 
         // Get Docker containers if it's a Docker module
         if (module.type === 'docker') {
@@ -95,6 +108,14 @@ const Dashboard: React.FC = () => {
     const interval = setInterval(loadConfigAndStatus, 3000); // Refresh every 3s
     return () => clearInterval(interval);
   }, [loadConfigAndStatus]);
+
+  // Update system resources more frequently
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSystemResources(getSystemResources());
+    }, 2000); // Update every 2s
+    return () => clearInterval(interval);
+  }, []);
 
   const handleModuleAction = useCallback(async (action: 'start' | 'stop' | 'restart') => {
     const module = modules[selectedModule];
@@ -214,11 +235,19 @@ const Dashboard: React.FC = () => {
           <Text bold color="cyan">
             {'🎵 CANTO DEVELOPMENT DASHBOARD'}
           </Text>
-          <Box marginTop={1}>
+          <Box marginTop={1} flexDirection="column">
             <Text dimColor>
               {stats.runningCount} Running • {stats.stoppedCount} Stopped • {stats.total} Total
               {isProcessing && <Text color="yellow"> • Processing...</Text>}
             </Text>
+            <Box marginTop={1} flexDirection="column">
+              <Text dimColor>
+                <Text bold>CPU:</Text> {createBar(systemResources.cpuUsage, 100, 15)} {formatCPU(systemResources.cpuUsage)}
+              </Text>
+              <Text dimColor>
+                <Text bold>RAM:</Text> {createBar(systemResources.usedMemory, systemResources.totalMemory, 15)} {formatMemory(systemResources.usedMemory)}/{formatMemory(systemResources.totalMemory)}
+              </Text>
+            </Box>
           </Box>
         </Box>
       </Box>
@@ -278,7 +307,15 @@ const ModuleRow: React.FC<{ module: ModuleStatus; isSelected: boolean }> = React
           {isSelected ? '❯' : ' '} {statusIcon} {module.name.padEnd(20)} {module.type.padEnd(10)}
         </Text>
         {module.pid && (
-          <Text dimColor> PID {module.pid}</Text>
+          <>
+            <Text dimColor> PID {module.pid}</Text>
+            {module.cpu !== undefined && (
+              <Text dimColor> • CPU {module.cpu.toFixed(1)}%</Text>
+            )}
+            {module.memory !== undefined && (
+              <Text dimColor> • RAM {formatMemory(module.memory)}</Text>
+            )}
+          </>
         )}
       </Box>
 
