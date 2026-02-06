@@ -148,7 +148,11 @@ export function configToYaml(config: Config): string {
   lines.push('modules:');
 
   for (const module of config.modules) {
-    lines.push(`  - name: ${module.name}`);
+    // Escape names with special characters (like @scoped packages)
+    const safeName = module.name.includes('@') || module.name.includes(':') || module.name.includes('#')
+      ? `"${module.name}"`
+      : module.name;
+    lines.push(`  - name: ${safeName}`);
     lines.push(`    type: ${module.type}`);
 
     switch (module.type) {
@@ -199,7 +203,10 @@ export function configToYaml(config: Config): string {
     if (module.dependsOn && module.dependsOn.length > 0) {
       lines.push('    dependsOn:');
       for (const dep of module.dependsOn) {
-        lines.push(`      - ${dep}`);
+        const safeDep = dep.includes('@') || dep.includes(':') || dep.includes('#')
+          ? `"${dep}"`
+          : dep;
+        lines.push(`      - ${safeDep}`);
       }
     }
 

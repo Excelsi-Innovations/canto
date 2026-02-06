@@ -84,13 +84,15 @@ function parseWorkspace(dir: string, packageManager: PackageManager): DetectedWo
 }
 
 /**
- * Detect Docker Compose files
+ * Detect Docker Compose files recursively
  *
  * @param dir - Root directory
+ * @param maxDepth - Maximum depth to search (default: 3)
  * @returns Docker detection result
  */
-function detectDocker(dir: string): DetectedDocker {
+function detectDocker(dir: string, maxDepth = 3): DetectedDocker {
   const composeFiles: string[] = [];
+  let hasDockerfile = false;
 
   const possibleComposeFiles = [
     'docker-compose.yml',
@@ -99,15 +101,52 @@ function detectDocker(dir: string): DetectedDocker {
     'compose.yaml',
     'docker-compose.dev.yml',
     'docker-compose.dev.yaml',
+    'docker-compose.legacy.yml',
+    'docker-compose.legacy.yaml',
   ];
 
-  for (const file of possibleComposeFiles) {
-    if (existsSync(join(dir, file))) {
-      composeFiles.push(file);
-    }
-  }
+  // Search recursively up to maxDepth
+  const searchDir = (currentDir: string, depth: number): void => {
+    if (depth > maxDepth) return;
 
-  const hasDockerfile = existsSync(join(dir, 'Dockerfile'));
+    try {
+      // Check for compose files in current directory
+      for (const file of possibleComposeFiles) {
+        const fullPath = join(currentDir, file);
+        if (existsSync(fullPath)) {
+          // Store relative path from root
+          const relativePath = currentDir === dir ? file : join(currentDir.replace(dir, '').slice(1), file);
+          if (!composeFiles.includes(relativePath)) {
+            composeFiles.push(relativePath);
+          }
+        }
+      }
+
+      // Check for Dockerfile
+      if (!hasDockerfile && existsSync(join(currentDir, 'Dockerfile'))) {
+        hasDockerfile = true;
+      }
+
+      // Search subdirectories (common infra directories)
+      if (depth < maxDepth) {
+        const commonInfraDirs = ['infra', 'infrastructure', 'docker', 'deployments', '.docker'];
+        
+        for (const subdir of commonInfraDirs) {
+          const subdirPath = join(currentDir, subdir);
+          if (existsSync(subdirPath)) {
+            const stat = statSync(subdirPath);
+            if (stat.isDirectory()) {
+              searchDir(subdirPath, depth + 1);
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore errors (permission issues, etc.)
+    }
+  };
+
+  searchDir(dir, 0);
 
   return { composeFiles, hasDockerfile };
 }

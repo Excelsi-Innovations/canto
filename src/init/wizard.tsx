@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
+import Spinner from 'ink-spinner';
+import Gradient from 'ink-gradient';
+import BigText from 'ink-big-text';
 import type { ProjectDetectionResult } from './detector.js';
 
 interface InitWizardProps {
@@ -13,11 +16,11 @@ interface InitWizardProps {
   onCancel: () => void;
 }
 
-type Step = 'welcome' | 'workspaces' | 'docker' | 'prerequisites' | 'ports' | 'confirm';
+type Step = 'welcome' | 'analyzing' | 'workspaces' | 'docker' | 'prerequisites' | 'ports' | 'confirm';
 
 /**
- * Interactive init wizard component
- * Uses Ink for terminal UI
+ * Interactive init wizard component with beautiful UI
+ * Uses Ink for terminal UI with animations and colors
  */
 export function InitWizard({
   detection,
@@ -26,10 +29,26 @@ export function InitWizard({
 }: InitWizardProps): React.JSX.Element {
   const { exit } = useApp();
   const [step, setStep] = useState<Step>('welcome');
+  const [showAnalyzing, setShowAnalyzing] = useState(false);
   const [selectedWorkspaces] = useState<string[]>(detection.workspaces.map((w) => w.name));
   const [includeDocker, setIncludeDocker] = useState(detection.docker.composeFiles.length > 0);
   const [includePrerequisites, setIncludePrerequisites] = useState(true);
   const [autoAllocatePorts, setAutoAllocatePorts] = useState(true);
+
+  // Show analyzing animation after welcome
+  useEffect(() => {
+    if (step === 'welcome') {
+      const timer = setTimeout(() => {
+        setShowAnalyzing(true);
+        setTimeout(() => {
+          setShowAnalyzing(false);
+          setStep(detection.workspaces.length > 0 ? 'workspaces' : 'docker');
+        }, 1500);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [step, detection.workspaces.length]);
 
   useInput((input: string, key: { escape?: boolean; return?: boolean }) => {
     if (key.escape || (input === 'q' && step === 'welcome')) {
@@ -37,6 +56,8 @@ export function InitWizard({
       exit();
       return;
     }
+
+    if (step === 'analyzing') return; // Ignore input during animation
 
     if (key.return || input === 'y') {
       handleNext();
@@ -50,7 +71,7 @@ export function InitWizard({
   const handleNext = (): void => {
     switch (step) {
       case 'welcome':
-        setStep(detection.workspaces.length > 0 ? 'workspaces' : 'docker');
+        setStep('analyzing');
         break;
       case 'workspaces':
         setStep('docker');
@@ -97,30 +118,65 @@ export function InitWizard({
     }
   };
 
+  if (showAnalyzing) {
+    return <AnalyzingStep />;
+  }
+
   return (
-    <Box flexDirection="column" padding={1}>
+    <Box flexDirection="column" paddingX={2} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">
-          🚀 Canto Init Wizard
-        </Text>
+        <Gradient name="rainbow">
+          <Text bold>🎵 Canto Init Wizard</Text>
+        </Gradient>
       </Box>
 
-      {step === 'welcome' && <WelcomeStep detection={detection} />}
-      {step === 'workspaces' && <WorkspacesStep workspaces={detection.workspaces} />}
-      {step === 'docker' && <DockerStep docker={detection.docker} />}
-      {step === 'prerequisites' && <PrerequisitesStep />}
-      {step === 'ports' && <PortsStep />}
-      {step === 'confirm' && (
-        <ConfirmStep
-          selectedWorkspaces={selectedWorkspaces}
-          includeDocker={includeDocker}
-          includePrerequisites={includePrerequisites}
-          autoAllocatePorts={autoAllocatePorts}
-        />
-      )}
+      <Box borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1} flexDirection="column">
+        {step === 'welcome' && <WelcomeStep detection={detection} />}
+        {step === 'workspaces' && <WorkspacesStep workspaces={detection.workspaces} />}
+        {step === 'docker' && <DockerStep docker={detection.docker} />}
+        {step === 'prerequisites' && <PrerequisitesStep />}
+        {step === 'ports' && <PortsStep />}
+        {step === 'confirm' && (
+          <ConfirmStep
+            selectedWorkspaces={selectedWorkspaces}
+            includeDocker={includeDocker}
+            includePrerequisites={includePrerequisites}
+            autoAllocatePorts={autoAllocatePorts}
+            detection={detection}
+          />
+        )}
+      </Box>
 
       <Box marginTop={1}>
-        <Text dimColor>Press Enter to continue, Esc to cancel</Text>
+        <Text dimColor>
+          {step === 'confirm' ? (
+            <>
+              <Text color="green" bold>Y</Text>es to generate  <Text color="red" bold>N</Text>o to cancel  
+              <Text color="gray" bold> ESC</Text> to exit
+            </>
+          ) : (
+            <>
+              <Text color="green" bold>↵ Enter</Text> to continue  
+              <Text color="yellow" bold>N</Text> for No  
+              <Text color="gray" bold>ESC</Text> to cancel
+            </>
+          )}
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+function AnalyzingStep(): React.JSX.Element {
+  return (
+    <Box flexDirection="column" paddingX={2} paddingY={2}>
+      <Box marginBottom={2}>
+        <BigText text="Canto" font="tiny" colors={['cyan', 'magenta']} />
+      </Box>
+      <Box>
+        <Text color="cyan">
+          <Spinner type="dots" /> Analyzing your project...
+        </Text>
       </Box>
     </Box>
   );
@@ -128,25 +184,31 @@ export function InitWizard({
 
 function WelcomeStep({ detection }: { detection: ProjectDetectionResult }): React.JSX.Element {
   return (
-    <Box flexDirection="column">
-      <Text>
-        Detected <Text color="green">{detection.projectType}</Text> project using{' '}
-        <Text color="yellow">{detection.packageManager}</Text>
-      </Text>
+    <Box flexDirection="column" gap={1}>
+      <Box>
+        <Text>✨ Welcome to Canto! Let's set up your development environment.</Text>
+      </Box>
+
+      <Box flexDirection="column" marginTop={1} paddingLeft={2}>
+        <Box>
+          <Text color="green">🔍 Project Type: </Text>
+          <Text bold color="cyan">{detection.projectType}</Text>
+        </Box>
+        <Box>
+          <Text color="green">📦 Package Manager: </Text>
+          <Text bold color="yellow">{detection.packageManager}</Text>
+        </Box>
+      </Box>
+
       <Box marginTop={1}>
-        <Text>
-          Found <Text bold>{detection.workspaces.length}</Text> workspace(s)
+        <Text dimColor>
+          I've detected {detection.workspaces.length} workspace(s) 
+          {detection.docker.composeFiles.length > 0 && ` and ${detection.docker.composeFiles.length} Docker Compose file(s)`}.
         </Text>
       </Box>
-      {detection.docker.composeFiles.length > 0 && (
-        <Box marginTop={1}>
-          <Text>
-            Found <Text bold>{detection.docker.composeFiles.length}</Text> Docker Compose file(s)
-          </Text>
-        </Box>
-      )}
+
       <Box marginTop={1}>
-        <Text color="cyan">Let's configure your project!</Text>
+        <Text color="cyan">Ready to configure? Let's go! 🚀</Text>
       </Box>
     </Box>
   );
@@ -158,21 +220,28 @@ function WorkspacesStep({
   workspaces: ProjectDetectionResult['workspaces'];
 }): React.JSX.Element {
   return (
-    <Box flexDirection="column">
-      <Text bold>Found workspaces:</Text>
+    <Box flexDirection="column" gap={1}>
+      <Box>
+        <Text bold color="cyan">📦 Detected Workspaces</Text>
+      </Box>
+
       <Box flexDirection="column" marginTop={1}>
-        {workspaces.map((workspace) => (
-          <Box key={workspace.name}>
-            <Text color="green">✓</Text>
-            <Text>
-              {' '}
-              {workspace.name} <Text dimColor>({workspace.path})</Text>
-            </Text>
+        {workspaces.slice(0, 10).map((workspace) => (
+          <Box key={workspace.name} paddingLeft={2}>
+            <Text color="green">✓ </Text>
+            <Text bold>{workspace.name}</Text>
+            <Text dimColor> ({workspace.path.split(/[/\\]/).slice(-2).join('/')})</Text>
           </Box>
         ))}
+        {workspaces.length > 10 && (
+          <Box paddingLeft={2}>
+            <Text dimColor>... and {workspaces.length - 10} more</Text>
+          </Box>
+        )}
       </Box>
+
       <Box marginTop={1}>
-        <Text>All workspaces will be included in the configuration.</Text>
+        <Text color="yellow">💡 All workspaces will be included in your configuration.</Text>
       </Box>
     </Box>
   );
@@ -181,20 +250,34 @@ function WorkspacesStep({
 function DockerStep({ docker }: { docker: ProjectDetectionResult['docker'] }): React.JSX.Element {
   if (docker.composeFiles.length === 0) {
     return (
-      <Box flexDirection="column">
-        <Text>No Docker Compose files detected.</Text>
-        <Text dimColor>Skipping Docker configuration...</Text>
+      <Box flexDirection="column" gap={1}>
+        <Box>
+          <Text bold color="yellow">🐳 Docker Configuration</Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>No Docker Compose files detected. Skipping...</Text>
+        </Box>
       </Box>
     );
   }
 
   return (
-    <Box flexDirection="column">
-      <Text>
-        Found Docker Compose: <Text color="cyan">{docker.composeFiles[0]}</Text>
-      </Text>
+    <Box flexDirection="column" gap={1}>
+      <Box>
+        <Text bold color="cyan">🐳 Docker Configuration</Text>
+      </Box>
+
+      <Box flexDirection="column" marginTop={1} paddingLeft={2}>
+        {docker.composeFiles.map((file) => (
+          <Box key={file}>
+            <Text color="blue">📄 </Text>
+            <Text>{file}</Text>
+          </Box>
+        ))}
+      </Box>
+
       <Box marginTop={1}>
-        <Text>Include Docker infrastructure in configuration? (Y/n)</Text>
+        <Text>Include Docker infrastructure in configuration?</Text>
       </Box>
     </Box>
   );
@@ -202,16 +285,29 @@ function DockerStep({ docker }: { docker: ProjectDetectionResult['docker'] }): R
 
 function PrerequisitesStep(): React.JSX.Element {
   return (
-    <Box flexDirection="column">
-      <Text>Add prerequisites validation?</Text>
-      <Box marginTop={1} flexDirection="column">
-        <Text dimColor>This will check for:</Text>
-        <Text dimColor> • Docker installation and status</Text>
-        <Text dimColor> • Docker Compose availability</Text>
-        <Text dimColor> • Node.js version (&gt;=18.0.0)</Text>
+    <Box flexDirection="column" gap={1}>
+      <Box>
+        <Text bold color="cyan">✅ Prerequisites Validation</Text>
       </Box>
+
       <Box marginTop={1}>
-        <Text>Include prerequisites? (Y/n)</Text>
+        <Text>Add automatic prerequisite checks before starting modules?</Text>
+      </Box>
+
+      <Box flexDirection="column" marginTop={1} paddingLeft={2}>
+        <Box>
+          <Text dimColor>→ Docker installation & status</Text>
+        </Box>
+        <Box>
+          <Text dimColor>→ Docker Compose availability</Text>
+        </Box>
+        <Box>
+          <Text dimColor>→ Node.js version (≥18.0.0)</Text>
+        </Box>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color="yellow">💡 Recommended for preventing runtime errors</Text>
       </Box>
     </Box>
   );
@@ -219,13 +315,23 @@ function PrerequisitesStep(): React.JSX.Element {
 
 function PortsStep(): React.JSX.Element {
   return (
-    <Box flexDirection="column">
-      <Text>Enable automatic port allocation?</Text>
-      <Box marginTop={1}>
-        <Text dimColor>Canto will automatically find and assign free ports to modules.</Text>
+    <Box flexDirection="column" gap={1}>
+      <Box>
+        <Text bold color="cyan">🔌 Port Allocation</Text>
       </Box>
+
       <Box marginTop={1}>
-        <Text>Enable auto port allocation? (Y/n)</Text>
+        <Text>Enable automatic port allocation?</Text>
+      </Box>
+
+      <Box marginTop={1} paddingLeft={2}>
+        <Text dimColor>
+          Canto will automatically find and assign free ports if conflicts are detected.
+        </Text>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color="yellow">💡 Prevents "port already in use" errors</Text>
       </Box>
     </Box>
   );
@@ -236,38 +342,61 @@ function ConfirmStep({
   includeDocker,
   includePrerequisites,
   autoAllocatePorts,
+  detection,
 }: {
   selectedWorkspaces: string[];
   includeDocker: boolean;
   includePrerequisites: boolean;
   autoAllocatePorts: boolean;
+  detection: ProjectDetectionResult;
 }): React.JSX.Element {
   return (
-    <Box flexDirection="column">
-      <Text bold>Configuration Summary:</Text>
-      <Box marginTop={1} flexDirection="column">
-        <Text>
-          Workspaces: <Text color="green">{selectedWorkspaces.length}</Text>
-        </Text>
-        <Text>
-          Docker:{' '}
-          <Text color={includeDocker ? 'green' : 'red'}>{includeDocker ? 'Yes' : 'No'}</Text>
-        </Text>
-        <Text>
-          Prerequisites:{' '}
-          <Text color={includePrerequisites ? 'green' : 'red'}>
-            {includePrerequisites ? 'Yes' : 'No'}
-          </Text>
-        </Text>
-        <Text>
-          Auto Ports:{' '}
-          <Text color={autoAllocatePorts ? 'green' : 'red'}>
-            {autoAllocatePorts ? 'Yes' : 'No'}
-          </Text>
-        </Text>
+    <Box flexDirection="column" gap={1}>
+      <Box>
+        <Text bold color="cyan">📋 Configuration Summary</Text>
       </Box>
+
+      <Box flexDirection="column" marginTop={1} paddingLeft={2} gap={0}>
+        <Box>
+          <Text>Project Type: </Text>
+          <Text bold color="magenta">{detection.projectType}</Text>
+        </Box>
+        <Box>
+          <Text>Package Manager: </Text>
+          <Text bold color="yellow">{detection.packageManager}</Text>
+        </Box>
+        <Box>
+          <Text>Workspaces: </Text>
+          <Text bold color={selectedWorkspaces.length > 0 ? 'green' : 'red'}>
+            {selectedWorkspaces.length}
+          </Text>
+        </Box>
+        {detection.docker.composeFiles.length > 0 && (
+          <Box>
+            <Text>Docker: </Text>
+            <Text bold color={includeDocker ? 'green' : 'red'}>
+              {includeDocker ? `Yes (${detection.docker.composeFiles.length} file${detection.docker.composeFiles.length > 1 ? 's' : ''})` : 'No'}
+            </Text>
+          </Box>
+        )}
+        <Box>
+          <Text>Prerequisites: </Text>
+          <Text bold color={includePrerequisites ? 'green' : 'yellow'}>
+            {includePrerequisites ? 'Enabled' : 'Disabled'}
+          </Text>
+        </Box>
+        <Box>
+          <Text>Auto Ports: </Text>
+          <Text bold color={autoAllocatePorts ? 'green' : 'yellow'}>
+            {autoAllocatePorts ? 'Enabled' : 'Disabled'}
+          </Text>
+        </Box>
+      </Box>
+
       <Box marginTop={1}>
-        <Text>Generate dev.config.yaml? (Y/n)</Text>
+        <Text>
+          Generate <Text bold color="cyan">dev.config.yaml</Text>?
+        </Text>
       </Box>
     </Box>
   );
