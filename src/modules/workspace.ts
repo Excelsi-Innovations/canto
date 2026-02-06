@@ -24,7 +24,11 @@ export class WorkspaceExecutor {
    */
   async start(id: string, config: WorkspaceModule): Promise<ProcessResult> {
     const cwd = resolve(config.path);
-    const command = config.run.dev;
+    const command = config.run.dev || config.run.start || config.run.build;
+
+    if (!command) {
+      throw new Error(`No runnable command found for workspace module ${config.name}`);
+    }
 
     return this.processManager.spawn({
       id,

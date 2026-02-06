@@ -28,11 +28,16 @@ function generateWorkspaceModule(workspace: DetectedWorkspace): Module {
     commands['test'] = 'npm run test';
   }
 
+  // If no commands available, skip this workspace
+  if (Object.keys(commands).length === 0) {
+    commands['build'] = 'npm run build'; // Default fallback
+  }
+
   return {
     name: workspace.name,
     type: 'workspace',
     path: workspace.path,
-    run: commands as { dev: string; build?: string; test?: string; start?: string },
+    run: commands as { dev?: string; build?: string; test?: string; start?: string },
     packageManager: workspace.packageManager,
     enabled: true,
     dependsOn: [],
@@ -158,18 +163,22 @@ export function configToYaml(config: Config): string {
     switch (module.type) {
       case 'workspace':
         lines.push(`    path: ${module.path}`);
-        lines.push('    run:');
-        if (module.run.dev) {
-          lines.push(`      dev: ${module.run.dev}`);
-        }
-        if (module.run.build) {
-          lines.push(`      build: ${module.run.build}`);
-        }
-        if (module.run.test) {
-          lines.push(`      test: ${module.run.test}`);
-        }
-        if (module.run.start) {
-          lines.push(`      start: ${module.run.start}`);
+        // Only add run: if there are commands
+        const hasCommands = module.run.dev || module.run.build || module.run.test || module.run.start;
+        if (hasCommands) {
+          lines.push('    run:');
+          if (module.run.dev) {
+            lines.push(`      dev: ${module.run.dev}`);
+          }
+          if (module.run.build) {
+            lines.push(`      build: ${module.run.build}`);
+          }
+          if (module.run.test) {
+            lines.push(`      test: ${module.run.test}`);
+          }
+          if (module.run.start) {
+            lines.push(`      start: ${module.run.start}`);
+          }
         }
         if (module.packageManager && module.packageManager !== 'auto') {
           lines.push(`    packageManager: ${module.packageManager}`);

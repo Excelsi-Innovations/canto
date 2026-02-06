@@ -3,10 +3,15 @@ import { z } from 'zod';
 export const ModuleTypeSchema = z.enum(['workspace', 'docker', 'custom']);
 
 export const WorkspaceCommandsSchema = z.object({
-  dev: z.string().describe('Development command (e.g., "npm run dev")'),
+  dev: z.string().optional().describe('Development command (e.g., "npm run dev")'),
   build: z.string().optional().describe('Build command'),
   test: z.string().optional().describe('Test command'),
   start: z.string().optional().describe('Start command'),
+}).refine((data) => {
+  // At least one command must be provided
+  return data.dev || data.build || data.test || data.start;
+}, {
+  message: 'At least one command (dev, build, test, or start) must be specified',
 });
 
 const BaseModuleSchema = z.object({
