@@ -1,0 +1,64 @@
+# Source files
+src/
+tests/
+reference/
+
+# Config files
+tsconfig.json
+eslint.config.js
+eslint/
+.prettierrc
+.prettierignore
+
+# Development files
+*.log
+*.lock
+node_modules/
+.env
+.env.*
+
+# Test files
+coverage/
+*.test.ts
+*.spec.ts
+__tests__/
+
+# Build artifacts
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+
+# Documentation drafts
+docs/drafts/
+
+# Development configs
+dev.config.yaml
+dev.config.yml
+dev.config.json
+tmp/
+
+# Keep these in npm package:
+# dist/
+# bin/
+# README.md
+# LICENSE*
+# package.json
+# CONTRIBUTING.md
+# CHANGELOG.md

@@ -1,0 +1,71 @@
+# Canto Configuration Example
+# Place this file as `dev.config.yaml` in your project root
+
+# Optional global configuration
+global:
+  logsDir: ./tmp
+  autoAllocatePorts: true
+  prerequisites:
+    docker: true
+    dockerCompose: true
+    node: ">=18.0.0"
+
+# Define your modules
+modules:
+  # Example: Docker infrastructure
+  - name: infra
+    type: docker
+    composeFile: ./docker-compose.dev.yaml
+    services:
+      - postgres
+      - redis
+      - traefik
+    enabled: true
+
+  # Example: Backend workspace (Node.js/TypeScript)
+  - name: backend
+    type: workspace
+    path: ./apps/backend
+    run:
+      dev: npm run dev
+      build: npm run build
+      test: npm test
+    dependsOn:
+      - infra
+    logs: ./tmp/backend.log
+    env:
+      NODE_ENV: development
+      PORT: "3000"
+      DATABASE_URL: "postgresql://user:pass@localhost:5432/db"
+    packageManager: npm  # auto | npm | yarn | pnpm | bun
+
+  # Example: Frontend workspace (React/Vue/etc)
+  - name: frontend
+    type: workspace
+    path: ./apps/frontend
+    run:
+      dev: npm run dev
+      build: npm run build
+    dependsOn:
+      - backend
+    env:
+      VITE_API_URL: "http://localhost:3000"
+    packageManager: pnpm
+
+  # Example: Background worker
+  - name: worker
+    type: custom
+    command: node scripts/worker.js
+    cwd: ./apps/backend
+    dependsOn:
+      - infra
+    logs: ./tmp/worker.log
+
+  # Example: Python service
+  - name: ml-service
+    type: custom
+    command: python -m uvicorn main:app --reload --port 8000
+    cwd: ./services/ml
+    dependsOn:
+      - infra
+    enabled: false  # Disable by default

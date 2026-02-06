@@ -1,0 +1,18 @@
+{
+  "modules": [
+    {
+      "name": "backend",
+      "type": "workspace",
+      "path": "./apps/backend",
+      "run": {
+        "dev": "npm run dev",
+        "build": "npm run build"
+      }
+    },
+    {
+      "name": "infra",
+      "type": "docker",
+      "composeFile": "./docker-compose.yaml"
+    }
+  ]
+}

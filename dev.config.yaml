@@ -1,0 +1,18 @@
+# Canto Test Configuration
+
+global:
+  logsDir: ./tmp
+  autoAllocatePorts: true
+
+modules:
+  - name: test-backend
+    type: custom
+    command: echo "Backend running..." && sleep 10
+    enabled: true
+
+  - name: test-frontend
+    type: custom
+    command: echo "Frontend running..." && sleep 10
+    dependsOn:
+      - test-backend
+    enabled: true

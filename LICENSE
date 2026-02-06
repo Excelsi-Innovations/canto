@@ -1,0 +1,36 @@
+# Canto Dual License
+
+Canto is available under two different licenses:
+
+## 1. Open Source License (MIT)
+
+For personal, educational, and open-source projects, Canto is licensed under the MIT License.
+
+**Permitted uses:**
+- Personal projects
+- Educational purposes
+- Open-source projects (with MIT-compatible license)
+- Non-profit organizations
+- Internal use in non-commercial applications
+
+See [LICENSE-MIT](./LICENSE-MIT) for full terms.
+
+## 2. Commercial License
+
+For commercial use, SaaS applications, or redistribution in commercial products, a commercial license is required.
+
+**Commercial use includes:**
+- Using Canto in a commercial product or service
+- Offering Canto as part of a SaaS platform
+- Selling or redistributing Canto as part of a commercial package
+- Using Canto in internal tools for for-profit companies with >5 developers
+
+**Contact for commercial licensing:**
+- Email: thiago.santos@excelsi.dev
+- Website: https://excelsi.dev
+
+## Copyright
+
+Copyright (c) 2024 Thiago Santos / Excelsi
+
+All rights reserved. The dual licensing model allows Excelsi to offer commercial versions and enterprise support while keeping the core software open source for the community.
