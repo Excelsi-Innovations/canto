@@ -9,7 +9,7 @@ import { logsCommand } from './commands/logs.js';
 import { restartCommand } from './commands/restart.js';
 import { checkCommand } from './commands/check.js';
 import { initCommand } from './commands/init.js';
-import { menuCommand } from './commands/menu.js';
+import { dashboardCommand } from './commands/dashboard.js';
 import { envCommand } from './commands/env.js';
 import { errorBox } from './utils/format.js';
 
@@ -94,9 +94,15 @@ program
   .option('--diff <file>', 'Compare env file with its example')
   .action(envCommand);
 
-// Default action - show interactive menu
+program
+  .command('dashboard')
+  .alias('dash')
+  .description('Launch interactive dashboard (OS-style interface)')
+  .action(dashboardCommand);
+
+// Default action - show interactive dashboard
 program.action(async () => {
-  await menuCommand();
+  await dashboardCommand();
 });
 
 program.parse();

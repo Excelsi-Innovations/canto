@@ -1,0 +1,341 @@
+import React, { useState, useEffect } from 'react';
+import { render, Box, Text, useInput, useApp } from 'ink';
+import Spinner from 'ink-spinner';
+import { loadConfig } from '../../config/parser.js';
+import { ProcessManager } from '../../processes/manager.js';
+import { ModuleOrchestrator } from '../../modules/index.js';
+import { DockerExecutor } from '../../modules/docker.js';
+
+interface ModuleStatus {
+  name: string;
+  type: string;
+  status: 'RUNNING' | 'STOPPED' | 'STARTING' | 'STOPPING' | 'ERROR';
+  pid?: number;
+  uptime?: number;
+  containers?: Array<{
+    name: string;
+    status: string;
+    ports: string[];
+  }>;
+}
+
+type Screen = 'dashboard' | 'modules' | 'logs' | 'env' | 'help';
+
+const Dashboard: React.FC = () => {
+  const { exit } = useApp();
+  const [screen, setScreen] = useState<Screen>('dashboard');
+  const [selectedModule, setSelectedModule] = useState(0);
+  const [modules, setModules] = useState<ModuleStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [processManager] = useState(() => new ProcessManager());
+  const [orchestrator] = useState(() => new ModuleOrchestrator(processManager));
+  const [dockerExecutor] = useState(() => new DockerExecutor(processManager));
+
+  // Load configuration and status
+  useEffect(() => {
+    loadConfigAndStatus();
+    const interval = setInterval(loadConfigAndStatus, 2000); // Refresh every 2s
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadConfigAndStatus = async () => {
+    try {
+      const config = await loadConfig();
+      orchestrator.load(config);
+
+      const moduleNames = orchestrator.getModuleNames();
+      const statuses: ModuleStatus[] = [];
+
+      for (const name of moduleNames) {
+        const module = orchestrator.getModule(name);
+        if (!module) continue;
+
+        const status = processManager.getStatus(name);
+        const pid = processManager.getPid(name);
+
+        const moduleStatus: ModuleStatus = {
+          name,
+          type: module.type,
+          status: status as any || 'STOPPED',
+          pid,
+        };
+
+        // Get Docker containers if it's a Docker module
+        if (module.type === 'docker') {
+          try {
+            const services = dockerExecutor.getServices(module);
+            moduleStatus.containers = services
+              .filter((s) => s.container)
+              .map((s) => ({
+                name: s.container!.name,
+                status: s.container!.status,
+                ports: s.container!.ports.map((p) => {
+                  const match = p.match(/(?:[\d.]+:)?(\d+)->/);
+                  return match ? `:${match[1]}` : '';
+                }).filter(Boolean),
+              }));
+          } catch (e) {
+            // Ignore Docker errors
+          }
+        }
+
+        statuses.push(moduleStatus);
+      }
+
+      setModules(statuses);
+      setLoading(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
+    }
+  };
+
+  const handleModuleAction = async (action: 'start' | 'stop' | 'restart') => {
+    const module = modules[selectedModule];
+    if (!module) return;
+
+    try {
+      setLoading(true);
+      if (action === 'start') {
+        await orchestrator.start(module.name);
+      } else if (action === 'stop') {
+        await orchestrator.stop(module.name);
+      } else if (action === 'restart') {
+        await orchestrator.restart(module.name);
+      }
+      await loadConfigAndStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useInput((input, key) => {
+    if (input === 'q' || key.escape) {
+      exit();
+      return;
+    }
+
+    if (screen === 'dashboard') {
+      if (key.upArrow && selectedModule > 0) {
+        setSelectedModule(selectedModule - 1);
+      } else if (key.downArrow && selectedModule < modules.length - 1) {
+        setSelectedModule(selectedModule + 1);
+      } else if (input === '1' || input === 's') {
+        handleModuleAction('start');
+      } else if (input === '2' || input === 'x') {
+        handleModuleAction('stop');
+      } else if (input === '3' || input === 'r') {
+        handleModuleAction('restart');
+      } else if (input === 'm') {
+        setScreen('modules');
+      } else if (input === 'e') {
+        setScreen('env');
+      } else if (input === 'h' || input === '?') {
+        setScreen('help');
+      }
+    } else {
+      // Any screen can go back with ESC or 'b'
+      if (input === 'b' || key.escape) {
+        setScreen('dashboard');
+      }
+    }
+  });
+
+  if (loading && modules.length === 0) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box>
+          <Text color="cyan">
+            <Spinner type="dots" />
+            {' Loading Canto...'}
+          </Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box borderStyle="round" borderColor="red" padding={1}>
+          <Text color="red">✗ Error: {error}</Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Press 'q' to exit</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (screen === 'help') {
+    return <HelpScreen />;
+  }
+
+  if (screen === 'env') {
+    return <EnvScreen />;
+  }
+
+  // Main Dashboard
+  const runningCount = modules.filter((m) => m.status === 'RUNNING').length;
+  const stoppedCount = modules.filter((m) => m.status === 'STOPPED').length;
+
+  return (
+    <Box flexDirection="column" padding={1}>
+      {/* Header */}
+      <Box borderStyle="double" borderColor="cyan" padding={1} marginBottom={1}>
+        <Box flexDirection="column" width="100%">
+          <Text bold color="cyan">
+            {'🎵 CANTO DEVELOPMENT DASHBOARD'}
+          </Text>
+          <Box marginTop={1}>
+            <Text dimColor>
+              {runningCount} Running • {stoppedCount} Stopped • {modules.length} Total
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Module List */}
+      <Box borderStyle="round" borderColor="gray" padding={1} marginBottom={1} flexDirection="column">
+        <Box marginBottom={1}>
+          <Text bold color="yellow">
+            {'📦 MODULES'}
+          </Text>
+        </Box>
+
+        {modules.map((module, index) => {
+          const isSelected = index === selectedModule;
+          const statusIcon = module.status === 'RUNNING' ? '●' : module.status === 'ERROR' ? '✗' : '○';
+
+          return (
+            <Box key={module.name} marginBottom={1}>
+              <Box width="100%">
+                <Text backgroundColor={isSelected ? 'blue' : undefined} color={isSelected ? 'white' : undefined}>
+                  {isSelected ? '❯' : ' '} {statusIcon} {module.name.padEnd(20)} {module.type.padEnd(10)}
+                </Text>
+                {module.pid && (
+                  <Text dimColor> PID {module.pid}</Text>
+                )}
+              </Box>
+
+              {/* Show Docker containers if selected and available */}
+              {isSelected && module.containers && module.containers.length > 0 && (
+                <Box marginLeft={4} marginTop={1} flexDirection="column">
+                  {module.containers.map((container) => (
+                    <Box key={container.name} marginBottom={0}>
+                      <Text dimColor>
+                        {'├─ '}
+                        <Text color={container.status === 'running' ? 'green' : 'gray'}>
+                          {container.status === 'running' ? '●' : '○'}
+                        </Text>
+                        {' '}{container.name}
+                        {container.ports.length > 0 && (
+                          <Text color="cyan"> {container.ports.join(', ')}</Text>
+                        )}
+                      </Text>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          );
+        })}
+      </Box>
+
+      {/* Action Bar */}
+      <Box borderStyle="round" borderColor="gray" padding={1} marginBottom={1}>
+        <Box flexDirection="column" width="100%">
+          <Text bold color="green">{'⚡ ACTIONS'}</Text>
+          <Box marginTop={1}>
+            <Text>
+              <Text color="green">[1/S]</Text> Start  {' '}
+              <Text color="red">[2/X]</Text> Stop  {' '}
+              <Text color="yellow">[3/R]</Text> Restart  {' '}
+              <Text color="cyan">[M]</Text> Modules  {' '}
+              <Text color="magenta">[E]</Text> Env  {' '}
+              <Text dimColor>[Q]</Text> Quit
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Status Bar */}
+      <Box borderStyle="single" borderColor="gray" padding={1}>
+        <Text dimColor>
+          Use ↑↓ to navigate • Press keys for actions • Press 'h' for help
+        </Text>
+      </Box>
+    </Box>
+  );
+};
+
+const HelpScreen: React.FC = () => {
+  return (
+    <Box flexDirection="column" padding={1}>
+      <Box borderStyle="double" borderColor="cyan" padding={1} marginBottom={1}>
+        <Text bold color="cyan">
+          {'📖 CANTO HELP'}
+        </Text>
+      </Box>
+
+      <Box borderStyle="round" borderColor="gray" padding={1} flexDirection="column">
+        <Text bold color="yellow">Navigation</Text>
+        <Text>  ↑↓         Navigate modules</Text>
+        <Text>  Enter      Select/Execute</Text>
+        <Text>  ESC/B      Go back</Text>
+        <Text>  Q          Quit Canto</Text>
+        <Box marginTop={1} />
+
+        <Text bold color="yellow">Module Actions</Text>
+        <Text>  1 or S     Start selected module</Text>
+        <Text>  2 or X     Stop selected module</Text>
+        <Text>  3 or R     Restart selected module</Text>
+        <Box marginTop={1} />
+
+        <Text bold color="yellow">Screens</Text>
+        <Text>  M          Module management</Text>
+        <Text>  E          Environment variables</Text>
+        <Text>  H or ?     This help screen</Text>
+        <Box marginTop={1} />
+
+        <Text dimColor>Press 'b' or ESC to go back</Text>
+      </Box>
+    </Box>
+  );
+};
+
+const EnvScreen: React.FC = () => {
+  return (
+    <Box flexDirection="column" padding={1}>
+      <Box borderStyle="double" borderColor="magenta" padding={1} marginBottom={1}>
+        <Text bold color="magenta">
+          {'🔧 ENVIRONMENT VARIABLES'}
+        </Text>
+      </Box>
+
+      <Box borderStyle="round" borderColor="gray" padding={1} flexDirection="column">
+        <Text color="yellow">Environment management features:</Text>
+        <Text>  • List all .env files</Text>
+        <Text>  • Check for missing variables</Text>
+        <Text>  • View port assignments</Text>
+        <Text>  • Compare with examples</Text>
+        <Box marginTop={1} />
+
+        <Text color="cyan">Use CLI commands:</Text>
+        <Text dimColor>  canto env --list     List all env files</Text>
+        <Text dimColor>  canto env --ports    Show port assignments</Text>
+        <Text dimColor>  canto env --check    Check for issues</Text>
+        <Box marginTop={1} />
+
+        <Text dimColor>Press 'b' or ESC to go back</Text>
+      </Box>
+    </Box>
+  );
+};
+
+export async function dashboardCommand(): Promise<void> {
+  render(<Dashboard />);
+}

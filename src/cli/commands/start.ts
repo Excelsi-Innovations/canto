@@ -50,22 +50,31 @@ export async function startCommand(modules: string[], options: StartOptions): Pr
 
     // Allocate ports if enabled
     if (config.global?.autoAllocatePorts) {
-      console.log(`${colors.cyan(colors.bold(`${icons.sparkles} Allocating ports...`))}\n`);
-      const portMap = await allocatePortsForModules(config.modules);
+      try {
+        console.log(`${colors.cyan(colors.bold(`${icons.sparkles} Allocating ports...`))}\n`);
+        const portMap = await allocatePortsForModules(config.modules);
 
-      // Update module environment variables with allocated ports
-      for (const module of config.modules) {
-        if (portMap.has(module.name) && module.env) {
-          const port = portMap.get(module.name);
-          if (port && module.env['PORT'] === undefined) {
-            module.env['PORT'] = String(port);
-            console.log(
-              `  ${colors.dim(`${icons.success} ${module.name}:`)} ${colors.cyan(`PORT=${port}`)}`
-            );
+        // Update module environment variables with allocated ports
+        for (const module of config.modules) {
+          if (portMap.has(module.name) && module.env) {
+            const port = portMap.get(module.name);
+            if (port && module.env['PORT'] === undefined) {
+              module.env['PORT'] = String(port);
+              console.log(
+                `  ${colors.dim(`${icons.success} ${module.name}:`)} ${colors.cyan(`PORT=${port}`)}`
+              );
+            }
           }
         }
+        console.log('');
+      } catch (error) {
+        console.log(
+          colors.yellow(
+            `${icons.warning} Port allocation failed, continuing without auto-allocation...\n`
+          )
+        );
+        console.log(colors.dim(`Error: ${error instanceof Error ? error.message : String(error)}\n`));
       }
-      console.log('');
     }
 
     const processManager = new ProcessManager();
