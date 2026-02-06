@@ -23,6 +23,7 @@ export const icons = {
   down: '↓',
   bullet: '•',
   check: '🔍',
+  compare: '⚖️',
 };
 
 export const colors = {

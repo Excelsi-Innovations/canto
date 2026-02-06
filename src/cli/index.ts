@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import pc from 'picocolors';
 import { VERSION } from '../version.js';
 import { startCommand } from './commands/start.js';
 import { stopCommand } from './commands/stop.js';
@@ -9,6 +10,37 @@ import { restartCommand } from './commands/restart.js';
 import { checkCommand } from './commands/check.js';
 import { initCommand } from './commands/init.js';
 import { menuCommand } from './commands/menu.js';
+import { envCommand } from './commands/env.js';
+import { errorBox } from './utils/format.js';
+
+// Global error handlers - NEVER let Canto crash!
+process.on('uncaughtException', (error: Error) => {
+  console.error('\n' + errorBox('Uncaught Exception', error.message));
+  console.error(pc.dim('\nStack trace:'));
+  console.error(pc.dim(error.stack || 'No stack trace available'));
+  console.error(pc.yellow('\n⚠️  Canto is still running. Use Ctrl+C to exit.\n'));
+});
+
+process.on('unhandledRejection', (reason: unknown) => {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  console.error('\n' + errorBox('Unhandled Promise Rejection', message));
+  if (reason instanceof Error && reason.stack) {
+    console.error(pc.dim('\nStack trace:'));
+    console.error(pc.dim(reason.stack));
+  }
+  console.error(pc.yellow('\n⚠️  Canto is still running. Use Ctrl+C to exit.\n'));
+});
+
+// Graceful shutdown on SIGINT/SIGTERM
+process.on('SIGINT', () => {
+  console.log(pc.cyan('\n\n👋 Canto shutting down gracefully...\n'));
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log(pc.cyan('\n\n👋 Canto shutting down gracefully...\n'));
+  process.exit(0);
+});
 
 const program = new Command();
 
@@ -47,11 +79,20 @@ program
   .action(statusCommand);
 
 program
-  .command('logs <module>')
-  .description('View logs for a specific module')
+  .command('logs <target>')
+  .description('View logs for a module or container (use module:container for Docker containers)')
   .option('-f, --follow', 'Follow log output', true)
   .option('-n, --lines <number>', 'Number of lines to show', '50')
   .action(logsCommand);
+
+program
+  .command('env')
+  .description('Manage environment variables')
+  .option('--list', 'List all environment files')
+  .option('--ports', 'Show port assignments from env files')
+  .option('--check', 'Check for missing variables')
+  .option('--diff <file>', 'Compare env file with its example')
+  .action(envCommand);
 
 // Default action - show interactive menu
 program.action(async () => {

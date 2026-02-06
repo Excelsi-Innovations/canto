@@ -3,6 +3,13 @@ import type { DockerModule } from '../config/schema.js';
 import type { ProcessResult } from '../processes/types.js';
 import { execSync } from 'child_process';
 import { resolve, dirname } from 'path';
+import {
+  detectDockerCompose,
+  listContainers,
+  getServicesContainers,
+  type DockerContainer,
+  type DockerComposeService,
+} from '../utils/docker.js';
 
 type DockerComposeCommand = 'docker compose' | 'docker-compose';
 
@@ -16,7 +23,7 @@ export class DockerExecutor {
 
   constructor(processManager: ProcessManager) {
     this.processManager = processManager;
-    this.composeCommand = this.detectDockerCompose();
+    this.composeCommand = detectDockerCompose();
   }
 
   /**
@@ -82,25 +89,22 @@ export class DockerExecutor {
   }
 
   /**
-   * Detect which Docker Compose command is available
-   * Prefers 'docker compose' (v2) over 'docker-compose' (v1)
+   * Get all containers for this Docker Compose module
    *
-   * @returns Available Docker Compose command
+   * @param config - Docker module configuration
+   * @returns Array of Docker containers
    */
-  private detectDockerCompose(): DockerComposeCommand {
-    try {
-      execSync('docker compose version', { stdio: 'ignore' });
-      return 'docker compose';
-    } catch {
-      try {
-        execSync('docker-compose --version', { stdio: 'ignore' });
-        return 'docker-compose';
-      } catch {
-        console.warn(
-          '⚠️  Neither "docker compose" nor "docker-compose" found. Docker modules may fail.'
-        );
-        return 'docker compose';
-      }
-    }
+  getContainers(config: DockerModule): DockerContainer[] {
+    return listContainers(config.composeFile);
+  }
+
+  /**
+   * Get services with their container information
+   *
+   * @param config - Docker module configuration
+   * @returns Array of services with container info
+   */
+  getServices(config: DockerModule): DockerComposeService[] {
+    return getServicesContainers(config.composeFile, config.services);
   }
 }
