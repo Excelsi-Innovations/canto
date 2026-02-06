@@ -36,6 +36,8 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [systemResources, setSystemResources] = useState<SystemResources>(() => getSystemResources());
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const [processManager] = useState(() => new ProcessManager());
   const [orchestrator] = useState(() => new ModuleOrchestrator(processManager));
@@ -120,8 +122,15 @@ const Dashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Memoize filtered modules based on search query
+  const filteredModules = useMemo(() => {
+    if (!searchQuery) return modules;
+    const query = searchQuery.toLowerCase();
+    return modules.filter(m => m.name.toLowerCase().includes(query));
+  }, [modules, searchQuery]);
+
   const handleModuleAction = useCallback(async (action: 'start' | 'stop' | 'restart') => {
-    const module = modules[selectedModule];
+    const module = filteredModules[selectedModule];
     if (!module || isProcessing) return;
 
     try {
@@ -143,7 +152,7 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [modules, selectedModule, orchestrator, loadConfigAndStatus, isProcessing]);
+  }, [filteredModules, selectedModule, orchestrator, loadConfigAndStatus, isProcessing]);
 
   const handleExit = useCallback(() => {
     // Force exit immediately
@@ -158,7 +167,12 @@ const Dashboard: React.FC = () => {
     }
 
     if (key.escape) {
-      if (screen === 'dashboard') {
+      if (searchMode) {
+        // Exit search mode
+        setSearchMode(false);
+        setSearchQuery('');
+        setSelectedModule(0);
+      } else if (screen === 'dashboard') {
         handleExit();
       } else {
         setScreen('dashboard');
@@ -167,26 +181,39 @@ const Dashboard: React.FC = () => {
     }
 
     if (screen === 'dashboard') {
-      if (key.upArrow && selectedModule > 0) {
-        setSelectedModule(selectedModule - 1);
-      } else if (key.downArrow && selectedModule < modules.length - 1) {
-        setSelectedModule(selectedModule + 1);
-      } else if (input === '1' || input === 's' || input === 'S') {
-        handleModuleAction('start');
-      } else if (input === '2' || input === 'x' || input === 'X') {
-        handleModuleAction('stop');
-      } else if (input === '3' || input === 'r' || input === 'R') {
-        handleModuleAction('restart');
-      } else if (input === 'm' || input === 'M') {
-        setScreen('modules');
-      } else if (input === 'e' || input === 'E') {
-        setScreen('env');
-      } else if (input === 'l' || input === 'L') {
-        setScreen('logs');
-      } else if (input === 'i' || input === 'I') {
-        setScreen('history');
-      } else if (input === 'h' || input === 'H' || input === '?') {
-        setScreen('help');
+      if (searchMode) {
+        // In search mode - handle text input
+        if (key.backspace || key.delete) {
+          setSearchQuery(searchQuery.slice(0, -1));
+        } else if (input && input.length === 1 && /[a-zA-Z0-9-_]/.test(input)) {
+          setSearchQuery(searchQuery + input);
+        }
+      } else {
+        // Normal navigation mode
+        if (key.upArrow && selectedModule > 0) {
+          setSelectedModule(selectedModule - 1);
+        } else if (key.downArrow && selectedModule < filteredModules.length - 1) {
+          setSelectedModule(selectedModule + 1);
+        } else if (input === '/') {
+          setSearchMode(true);
+          setSearchQuery('');
+        } else if (input === '1' || input === 's' || input === 'S') {
+          handleModuleAction('start');
+        } else if (input === '2' || input === 'x' || input === 'X') {
+          handleModuleAction('stop');
+        } else if (input === '3' || input === 'r' || input === 'R') {
+          handleModuleAction('restart');
+        } else if (input === 'm' || input === 'M') {
+          setScreen('modules');
+        } else if (input === 'e' || input === 'E') {
+          setScreen('env');
+        } else if (input === 'l' || input === 'L') {
+          setScreen('logs');
+        } else if (input === 'i' || input === 'I') {
+          setScreen('history');
+        } else if (input === 'h' || input === 'H' || input === '?') {
+          setScreen('help');
+        }
       }
     } else {
       // Any screen can go back with 'b'
@@ -238,7 +265,7 @@ const Dashboard: React.FC = () => {
   }
 
   if (screen === 'logs') {
-    return <LogsScreen modules={modules} selectedModule={selectedModule} onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
+    return <LogsScreen modules={filteredModules} selectedModule={selectedModule} onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
   }
 
   if (screen === 'history') {
@@ -273,19 +300,41 @@ const Dashboard: React.FC = () => {
 
       {/* Module List */}
       <Box borderStyle="round" borderColor="gray" padding={1} marginBottom={1} flexDirection="column">
-        <Box marginBottom={1}>
+        <Box marginBottom={1} flexDirection="column">
           <Text bold color="yellow">
             {'📦 MODULES'}
           </Text>
+          {searchMode && (
+            <Box marginTop={1}>
+              <Text>
+                <Text color="cyan">Search: </Text>
+                <Text>{searchQuery}</Text>
+                <Text color="cyan">_</Text>
+                <Text dimColor> (ESC to clear)</Text>
+              </Text>
+            </Box>
+          )}
+          {searchQuery && !searchMode && (
+            <Box marginTop={1}>
+              <Text dimColor>
+                Filtered: {filteredModules.length}/{modules.length} modules
+                <Text color="cyan"> (Press / to search again)</Text>
+              </Text>
+            </Box>
+          )}
         </Box>
 
-        {modules.map((module, index) => (
-          <ModuleRow
-            key={module.name}
-            module={module}
-            isSelected={index === selectedModule}
-          />
-        ))}
+        {filteredModules.length === 0 ? (
+          <Text dimColor>No modules match "{searchQuery}"</Text>
+        ) : (
+          filteredModules.map((module, index) => (
+            <ModuleRow
+              key={module.name}
+              module={module}
+              isSelected={index === selectedModule}
+            />
+          ))
+        )}
       </Box>
 
       {/* Action Bar */}
@@ -314,7 +363,7 @@ const Dashboard: React.FC = () => {
       {/* Status Bar */}
       <Box borderStyle="single" borderColor="gray" padding={1}>
         <Text dimColor>
-          Use ↑↓ to navigate • Press keys for actions • Press 'h' for help
+          Use ↑↓ to navigate • Press '/' to search • Press keys for actions • Press 'h' for help
         </Text>
       </Box>
     </Box>
@@ -394,8 +443,9 @@ const HelpScreen: React.FC<ScreenProps> = ({ onBack, onQuit }) => {
       <Box borderStyle="round" borderColor="gray" padding={1} flexDirection="column">
         <Text bold color="yellow">Navigation</Text>
         <Text>  ↑↓         Navigate modules</Text>
+        <Text>  /          Search/filter modules</Text>
         <Text>  Enter      Select/Execute</Text>
-        <Text>  ESC/B      Go back</Text>
+        <Text>  ESC/B      Go back / Clear search</Text>
         <Text>  Q          Quit Canto</Text>
         <Box marginTop={1} />
 
