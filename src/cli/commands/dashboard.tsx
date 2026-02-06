@@ -8,6 +8,7 @@ import { ProcessManager } from '../../processes/manager.js';
 import { ModuleOrchestrator } from '../../modules/index.js';
 import { DockerExecutor } from '../../modules/docker.js';
 import { getSystemResources, getProcessResources, createBar, formatMemory, formatCPU, type SystemResources } from '../../utils/resources.js';
+import { getHistory, addToHistory, type CommandHistory } from '../../utils/preferences.js';
 
 interface ModuleStatus {
   name: string;
@@ -24,7 +25,7 @@ interface ModuleStatus {
   }>;
 }
 
-type Screen = 'dashboard' | 'modules' | 'logs' | 'env' | 'help';
+type Screen = 'dashboard' | 'modules' | 'logs' | 'env' | 'help' | 'history';
 
 const Dashboard: React.FC = () => {
   useApp(); // Just to trigger app context
@@ -127,14 +128,18 @@ const Dashboard: React.FC = () => {
       setIsProcessing(true);
       if (action === 'start') {
         await orchestrator.start(module.name);
+        addToHistory(`start ${module.name}`, module.name, true);
       } else if (action === 'stop') {
         await orchestrator.stop(module.name);
+        addToHistory(`stop ${module.name}`, module.name, true);
       } else if (action === 'restart') {
         await orchestrator.restart(module.name);
+        addToHistory(`restart ${module.name}`, module.name, true);
       }
       await loadConfigAndStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      addToHistory(`${action} ${module.name}`, module.name, false);
     } finally {
       setIsProcessing(false);
     }
@@ -178,6 +183,8 @@ const Dashboard: React.FC = () => {
         setScreen('env');
       } else if (input === 'l' || input === 'L') {
         setScreen('logs');
+      } else if (input === 'i' || input === 'I') {
+        setScreen('history');
       } else if (input === 'h' || input === 'H' || input === '?') {
         setScreen('help');
       }
@@ -232,6 +239,10 @@ const Dashboard: React.FC = () => {
 
   if (screen === 'logs') {
     return <LogsScreen modules={modules} selectedModule={selectedModule} onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
+  }
+
+  if (screen === 'history') {
+    return <HistoryScreen onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
   }
 
   // Main Dashboard
@@ -291,6 +302,7 @@ const Dashboard: React.FC = () => {
           <Box marginTop={0}>
             <Text>
               <Text color="yellow">[L]</Text> Logs  {' '}
+              <Text color="blue">[I]</Text> History  {' '}
               <Text color="cyan">[M]</Text> Modules  {' '}
               <Text color="magenta">[E]</Text> Env  {' '}
               <Text color="white">[Q]</Text> Quit
@@ -395,6 +407,7 @@ const HelpScreen: React.FC<ScreenProps> = ({ onBack, onQuit }) => {
 
         <Text bold color="yellow">Screens</Text>
         <Text>  L          Logs viewer</Text>
+        <Text>  I          Command history</Text>
         <Text>  M          Module management</Text>
         <Text>  E          Environment variables</Text>
         <Text>  H or ?     This help screen</Text>
@@ -530,6 +543,83 @@ const LogsScreen: React.FC<LogsScreenProps> = ({ modules, selectedModule, onBack
             {line || ' '}
           </Text>
         ))}
+      </Box>
+
+      <Box borderStyle="single" borderColor="gray" padding={1} marginTop={1}>
+        <Text dimColor>
+          Press 'b' or ESC to go back • Press 'q' to quit • Press 'r' to refresh
+        </Text>
+      </Box>
+    </Box>
+  );
+};
+
+const HistoryScreen: React.FC<ScreenProps> = ({ onBack, onQuit }) => {
+  const [history, setHistory] = useState<CommandHistory[]>([]);
+
+  useEffect(() => {
+    setHistory(getHistory(20));
+  }, []);
+
+  useInput((input, key) => {
+    if (input === 'q' || input === 'Q') {
+      onQuit();
+    } else if (input === 'b' || input === 'B' || key.escape) {
+      onBack();
+    } else if (input === 'r' || input === 'R') {
+      setHistory(getHistory(20));
+    }
+  });
+
+  const formatTimestamp = (date: Date) => {
+    const d = new Date(date);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+  };
+
+  return (
+    <Box flexDirection="column" padding={1}>
+      <Box borderStyle="double" borderColor="blue" padding={1} marginBottom={1}>
+        <Box flexDirection="column" width="100%">
+          <Text bold color="blue">
+            {'📜 COMMAND HISTORY'}
+          </Text>
+          <Box marginTop={1}>
+            <Text dimColor>
+              Last 20 commands • Press [R] to refresh
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+
+      <Box borderStyle="round" borderColor="gray" padding={1} flexDirection="column">
+        {history.length === 0 ? (
+          <Text dimColor>No command history yet</Text>
+        ) : (
+          history.map((entry, index) => (
+            <Box key={index} marginBottom={0}>
+              <Text>
+                <Text color={entry.success ? 'green' : 'red'}>
+                  {entry.success ? '✓' : '✗'}
+                </Text>
+                {' '}
+                <Text bold>{entry.command}</Text>
+                {entry.module && (
+                  <Text dimColor> ({entry.module})</Text>
+                )}
+                <Text dimColor> • {formatTimestamp(entry.timestamp)}</Text>
+              </Text>
+            </Box>
+          ))
+        )}
       </Box>
 
       <Box borderStyle="single" borderColor="gray" padding={1} marginTop={1}>
