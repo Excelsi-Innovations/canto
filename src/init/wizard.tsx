@@ -31,7 +31,7 @@ export function InitWizard({
   const [includePrerequisites, setIncludePrerequisites] = useState(true);
   const [autoAllocatePorts, setAutoAllocatePorts] = useState(true);
 
-  useInput((input, key) => {
+  useInput((input: string, key: { escape?: boolean; return?: boolean }) => {
     if (key.escape || (input === 'q' && step === 'welcome')) {
       onCancel();
       exit();

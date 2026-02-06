@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process';
-import { ProcessLogger } from './logger';
-import { ProcessStatus, type ProcessInfo, type SpawnOptions, type ProcessResult } from './types';
+import { ProcessLogger } from './logger.js';
+import { ProcessStatus, type ProcessInfo, type SpawnOptions, type ProcessResult } from './types.js';
 
 export class ProcessManager {
   private processes: Map<string, ProcessInfo> = new Map();

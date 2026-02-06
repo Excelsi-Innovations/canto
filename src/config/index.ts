@@ -3,8 +3,8 @@
  * Handles loading, parsing, and validating dev.config.* files
  */
 
-export * from './schema';
-export * from './parser';
+export * from './schema.js';
+export * from './parser.js';
 export {
   type Config,
   type Module,
@@ -12,4 +12,4 @@ export {
   type DockerModule,
   type CustomModule,
   type GlobalConfig,
-} from './schema';
+} from './schema.js';

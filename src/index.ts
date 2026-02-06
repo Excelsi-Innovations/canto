@@ -5,5 +5,5 @@
  * For CLI usage, use the bin/canto.ts entry point.
  */
 
-export * from './config';
-export { version } from './version';
+export * from './config/index.js';
+export { version } from './version.js';

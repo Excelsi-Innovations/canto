@@ -1,0 +1,202 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            # Extract changelog for this version
+            VERSION=${{ steps.get_version.outputs.version }}
+            CHANGELOG=$(awk "/## \[${VERSION}\]/,/## \[/" CHANGELOG.md | sed '1d;$d')
+            
+            if [ -z "$CHANGELOG" ]; then
+              CHANGELOG="See [CHANGELOG.md](https://github.com/Excelsi-Innovations/canto/blob/main/CHANGELOG.md) for details."
+            fi
+          else
+            CHANGELOG="Release version ${{ steps.get_version.outputs.version }}"
+          fi
+          
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          release_name: Canto v${{ steps.get_version.outputs.version }}
+          body: |
+            ## 🎵 Canto v${{ steps.get_version.outputs.version }}
+            
+            ### What's New
+            
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ### Installation
+            
+            ```bash
+            npm install -g canto
+            ```
+            
+            ### Quick Start
+            
+            ```bash
+            canto init
+            canto start --all
+            ```
+            
+            ---
+            
+            **Full Changelog**: https://github.com/Excelsi-Innovations/canto/blob/main/CHANGELOG.md
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
+
+  build-binaries:
+    name: Build ${{ matrix.platform }} binary
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        include:
+          - platform: linux-x64
+            os: ubuntu-latest
+            target: node20-linux-x64
+          - platform: macos-x64
+            os: macos-latest
+            target: node20-macos-x64
+          - platform: macos-arm64
+            os: macos-latest
+            target: node20-macos-arm64
+          - platform: windows-x64
+            os: windows-latest
+            target: node20-windows-x64
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Install pkg
+        run: npm install -g pkg
+
+      - name: Create standalone binary
+        run: |
+          pkg . --target ${{ matrix.target }} --output canto-${{ matrix.platform }}
+
+      - name: Compress binary (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          tar -czf canto-${{ matrix.platform }}.tar.gz canto-${{ matrix.platform }}
+          sha256sum canto-${{ matrix.platform }}.tar.gz > canto-${{ matrix.platform }}.tar.gz.sha256
+
+      - name: Compress binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          7z a canto-${{ matrix.platform }}.zip canto-${{ matrix.platform }}.exe
+          certutil -hashfile canto-${{ matrix.platform }}.zip SHA256 > canto-${{ matrix.platform }}.zip.sha256
+
+      - name: Upload Release Asset (Unix)
+        if: runner.os != 'Windows'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./canto-${{ matrix.platform }}.tar.gz
+          asset_name: canto-${{ matrix.platform }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload Release Asset (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./canto-${{ matrix.platform }}.zip
+          asset_name: canto-${{ matrix.platform }}.zip
+          asset_content_type: application/zip
+
+      - name: Upload checksums
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./canto-${{ matrix.platform }}.${{ runner.os == 'Windows' && 'zip' || 'tar.gz' }}.sha256
+          asset_name: canto-${{ matrix.platform }}.${{ runner.os == 'Windows' && 'zip' || 'tar.gz' }}.sha256
+          asset_content_type: text/plain
+
+  create-summary:
+    name: Create Release Summary
+    needs: [create-release, build-binaries]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Create summary
+        run: |
+          echo "## 🎉 Release v${{ needs.create-release.outputs.version }} Published!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- npm package: \`canto@${{ needs.create-release.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Binaries for Linux, macOS, and Windows" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Release Page](https://github.com/Excelsi-Innovations/canto/releases/tag/v${{ needs.create-release.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [npm Package](https://www.npmjs.com/package/canto)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Changelog](https://github.com/Excelsi-Innovations/canto/blob/main/CHANGELOG.md)" >> $GITHUB_STEP_SUMMARY

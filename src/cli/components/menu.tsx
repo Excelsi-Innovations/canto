@@ -22,7 +22,7 @@ export function InteractiveMenu({ config, onAction }: InteractiveMenuProps): Rea
   const [view, setView] = useState<'main' | 'modules' | 'logs'>('main');
   const [selectedAction, setSelectedAction] = useState<string>('');
 
-  useInput((input, key) => {
+  useInput((input: string, key: { escape?: boolean }) => {
     if (key.escape || input === 'q') {
       exit();
     }

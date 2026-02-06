@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { parse as parseYAML } from 'yaml';
-import { safeValidateConfig, type Config } from './schema';
+import { safeValidateConfig, type Config } from './schema.js';
 
 const CONFIG_FILES = [
   'dev.config.yaml',

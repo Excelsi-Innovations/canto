@@ -8,6 +8,7 @@ import { logsCommand } from './commands/logs.js';
 import { restartCommand } from './commands/restart.js';
 import { checkCommand } from './commands/check.js';
 import { initCommand } from './commands/init.js';
+import { menuCommand } from './commands/menu.js';
 
 const program = new Command();
 
@@ -52,9 +53,9 @@ program
   .option('-n, --lines <number>', 'Number of lines to show', '50')
   .action(logsCommand);
 
-program.action(() => {
-  console.log('Interactive menu not yet implemented. Use --help for available commands.');
-  process.exit(0);
+// Default action - show interactive menu
+program.action(async () => {
+  await menuCommand();
 });
 
 program.parse();
