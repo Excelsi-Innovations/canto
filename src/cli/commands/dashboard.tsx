@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
 import Spinner from 'ink-spinner';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 import { loadConfig } from '../../config/parser.js';
 import { ProcessManager } from '../../processes/manager.js';
 import { ModuleOrchestrator } from '../../modules/index.js';
@@ -174,6 +176,8 @@ const Dashboard: React.FC = () => {
         setScreen('modules');
       } else if (input === 'e' || input === 'E') {
         setScreen('env');
+      } else if (input === 'l' || input === 'L') {
+        setScreen('logs');
       } else if (input === 'h' || input === 'H' || input === '?') {
         setScreen('help');
       }
@@ -224,6 +228,10 @@ const Dashboard: React.FC = () => {
 
   if (screen === 'env') {
     return <EnvScreen onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
+  }
+
+  if (screen === 'logs') {
+    return <LogsScreen modules={modules} selectedModule={selectedModule} onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
   }
 
   // Main Dashboard
@@ -277,7 +285,12 @@ const Dashboard: React.FC = () => {
             <Text>
               <Text color="green">[1/S]</Text> Start  {' '}
               <Text color="red">[2/X]</Text> Stop  {' '}
-              <Text color="yellow">[3/R]</Text> Restart  {' '}
+              <Text color="yellow">[3/R]</Text> Restart
+            </Text>
+          </Box>
+          <Box marginTop={0}>
+            <Text>
+              <Text color="yellow">[L]</Text> Logs  {' '}
               <Text color="cyan">[M]</Text> Modules  {' '}
               <Text color="magenta">[E]</Text> Env  {' '}
               <Text color="white">[Q]</Text> Quit
@@ -381,6 +394,7 @@ const HelpScreen: React.FC<ScreenProps> = ({ onBack, onQuit }) => {
         <Box marginTop={1} />
 
         <Text bold color="yellow">Screens</Text>
+        <Text>  L          Logs viewer</Text>
         <Text>  M          Module management</Text>
         <Text>  E          Environment variables</Text>
         <Text>  H or ?     This help screen</Text>
@@ -424,6 +438,104 @@ const EnvScreen: React.FC<ScreenProps> = ({ onBack, onQuit }) => {
         <Box marginTop={1} />
 
         <Text dimColor>Press 'b' or ESC to go back • Press 'q' to quit</Text>
+      </Box>
+    </Box>
+  );
+};
+
+interface LogsScreenProps extends ScreenProps {
+  modules: ModuleStatus[];
+  selectedModule: number;
+}
+
+const LogsScreen: React.FC<LogsScreenProps> = ({ modules, selectedModule, onBack, onQuit }) => {
+  const [logContent, setLogContent] = useState<string>('');
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [currentModuleIndex, setCurrentModuleIndex] = useState(selectedModule);
+  const currentModule = modules[currentModuleIndex];
+
+  const loadLogs = useCallback(() => {
+    if (!currentModule || !currentModule.name) {
+      setLogContent('No module selected');
+      return;
+    }
+
+    try {
+      const logDir = join(process.cwd(), 'tmp', 'logs');
+      const logFile = join(logDir, `${currentModule.name}.log`);
+
+      if (!existsSync(logFile)) {
+        setLogContent(`No log file found for ${currentModule.name}\nExpected: ${logFile}`);
+        return;
+      }
+
+      const content = readFileSync(logFile, 'utf-8');
+      const lines = content.split('\n');
+      // Get last 100 lines
+      const recentLines = lines.slice(-100).join('\n');
+      setLogContent(recentLines || 'Log file is empty');
+    } catch (err) {
+      setLogContent(`Error reading logs: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [currentModule]);
+
+  useEffect(() => {
+    loadLogs();
+    // Auto-refresh logs every 2 seconds
+    const interval = setInterval(loadLogs, 2000);
+    return () => clearInterval(interval);
+  }, [loadLogs]);
+
+  useInput((input, key) => {
+    if (input === 'q' || input === 'Q') {
+      onQuit();
+    } else if (input === 'b' || input === 'B' || key.escape) {
+      onBack();
+    } else if (key.leftArrow && currentModuleIndex > 0) {
+      setCurrentModuleIndex(currentModuleIndex - 1);
+      setScrollOffset(0);
+    } else if (key.rightArrow && currentModuleIndex < modules.length - 1) {
+      setCurrentModuleIndex(currentModuleIndex + 1);
+      setScrollOffset(0);
+    } else if (key.upArrow && scrollOffset > 0) {
+      setScrollOffset(scrollOffset - 1);
+    } else if (key.downArrow) {
+      setScrollOffset(scrollOffset + 1);
+    } else if (input === 'r' || input === 'R') {
+      loadLogs();
+    }
+  });
+
+  const displayLines = logContent.split('\n').slice(scrollOffset, scrollOffset + 20);
+
+  return (
+    <Box flexDirection="column" padding={1}>
+      <Box borderStyle="double" borderColor="yellow" padding={1} marginBottom={1}>
+        <Box flexDirection="column" width="100%">
+          <Text bold color="yellow">
+            {'📋 LOGS VIEWER'}
+          </Text>
+          <Box marginTop={1}>
+            <Text dimColor>
+              Module: <Text bold color="cyan">{currentModule?.name || 'None'}</Text>
+              {' • '}Use ←→ to switch modules • ↑↓ to scroll • [R]efresh
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+
+      <Box borderStyle="round" borderColor="gray" padding={1} flexDirection="column" height={22}>
+        {displayLines.map((line, index) => (
+          <Text key={scrollOffset + index} dimColor={line.trim() === ''}>
+            {line || ' '}
+          </Text>
+        ))}
+      </Box>
+
+      <Box borderStyle="single" borderColor="gray" padding={1} marginTop={1}>
+        <Text dimColor>
+          Press 'b' or ESC to go back • Press 'q' to quit • Press 'r' to refresh
+        </Text>
       </Box>
     </Box>
   );
