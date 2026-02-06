@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
 import Spinner from 'ink-spinner';
 import { loadConfig } from '../../config/parser.js';
@@ -22,24 +22,23 @@ interface ModuleStatus {
 type Screen = 'dashboard' | 'modules' | 'logs' | 'env' | 'help';
 
 const Dashboard: React.FC = () => {
-  const { exit } = useApp();
+  useApp(); // Just to trigger app context
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [selectedModule, setSelectedModule] = useState(0);
   const [modules, setModules] = useState<ModuleStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
   const [processManager] = useState(() => new ProcessManager());
   const [orchestrator] = useState(() => new ModuleOrchestrator(processManager));
   const [dockerExecutor] = useState(() => new DockerExecutor(processManager));
 
   // Load configuration and status
-  useEffect(() => {
-    loadConfigAndStatus();
-    const interval = setInterval(loadConfigAndStatus, 2000); // Refresh every 2s
-    return () => clearInterval(interval);
-  }, []);
+  const loadConfigAndStatus = useCallback(async () => {
+    // Don't reload if we're processing an action
+    if (isProcessing) return;
 
-  const loadConfigAndStatus = async () => {
     try {
       const config = await loadConfig();
       orchestrator.load(config);
@@ -89,14 +88,20 @@ const Dashboard: React.FC = () => {
       setError(err instanceof Error ? err.message : String(err));
       setLoading(false);
     }
-  };
+  }, [orchestrator, processManager, dockerExecutor, isProcessing]);
 
-  const handleModuleAction = async (action: 'start' | 'stop' | 'restart') => {
+  useEffect(() => {
+    loadConfigAndStatus();
+    const interval = setInterval(loadConfigAndStatus, 3000); // Refresh every 3s
+    return () => clearInterval(interval);
+  }, [loadConfigAndStatus]);
+
+  const handleModuleAction = useCallback(async (action: 'start' | 'stop' | 'restart') => {
     const module = modules[selectedModule];
-    if (!module) return;
+    if (!module || isProcessing) return;
 
     try {
-      setLoading(true);
+      setIsProcessing(true);
       if (action === 'start') {
         await orchestrator.start(module.name);
       } else if (action === 'stop') {
@@ -108,13 +113,28 @@ const Dashboard: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false);
+      setIsProcessing(false);
     }
-  };
+  }, [modules, selectedModule, orchestrator, loadConfigAndStatus, isProcessing]);
+
+  const handleExit = useCallback(() => {
+    // Force exit immediately
+    process.exit(0);
+  }, []);
 
   useInput((input, key) => {
-    if (input === 'q' || key.escape) {
-      exit();
+    // Global quit - works from any screen
+    if (input === 'q' || input === 'Q') {
+      handleExit();
+      return;
+    }
+
+    if (key.escape) {
+      if (screen === 'dashboard') {
+        handleExit();
+      } else {
+        setScreen('dashboard');
+      }
       return;
     }
 
@@ -123,26 +143,33 @@ const Dashboard: React.FC = () => {
         setSelectedModule(selectedModule - 1);
       } else if (key.downArrow && selectedModule < modules.length - 1) {
         setSelectedModule(selectedModule + 1);
-      } else if (input === '1' || input === 's') {
+      } else if (input === '1' || input === 's' || input === 'S') {
         handleModuleAction('start');
-      } else if (input === '2' || input === 'x') {
+      } else if (input === '2' || input === 'x' || input === 'X') {
         handleModuleAction('stop');
-      } else if (input === '3' || input === 'r') {
+      } else if (input === '3' || input === 'r' || input === 'R') {
         handleModuleAction('restart');
-      } else if (input === 'm') {
+      } else if (input === 'm' || input === 'M') {
         setScreen('modules');
-      } else if (input === 'e') {
+      } else if (input === 'e' || input === 'E') {
         setScreen('env');
-      } else if (input === 'h' || input === '?') {
+      } else if (input === 'h' || input === 'H' || input === '?') {
         setScreen('help');
       }
     } else {
-      // Any screen can go back with ESC or 'b'
-      if (input === 'b' || key.escape) {
+      // Any screen can go back with 'b'
+      if (input === 'b' || input === 'B') {
         setScreen('dashboard');
       }
     }
   });
+
+  // Memoize computed values to prevent re-renders
+  const stats = useMemo(() => {
+    const runningCount = modules.filter((m) => m.status === 'RUNNING').length;
+    const stoppedCount = modules.filter((m) => m.status === 'STOPPED').length;
+    return { runningCount, stoppedCount, total: modules.length };
+  }, [modules]);
 
   if (loading && modules.length === 0) {
     return (
@@ -171,17 +198,14 @@ const Dashboard: React.FC = () => {
   }
 
   if (screen === 'help') {
-    return <HelpScreen />;
+    return <HelpScreen onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
   }
 
   if (screen === 'env') {
-    return <EnvScreen />;
+    return <EnvScreen onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
   }
 
   // Main Dashboard
-  const runningCount = modules.filter((m) => m.status === 'RUNNING').length;
-  const stoppedCount = modules.filter((m) => m.status === 'STOPPED').length;
-
   return (
     <Box flexDirection="column" padding={1}>
       {/* Header */}
@@ -192,7 +216,8 @@ const Dashboard: React.FC = () => {
           </Text>
           <Box marginTop={1}>
             <Text dimColor>
-              {runningCount} Running • {stoppedCount} Stopped • {modules.length} Total
+              {stats.runningCount} Running • {stats.stoppedCount} Stopped • {stats.total} Total
+              {isProcessing && <Text color="yellow"> • Processing...</Text>}
             </Text>
           </Box>
         </Box>
@@ -206,43 +231,13 @@ const Dashboard: React.FC = () => {
           </Text>
         </Box>
 
-        {modules.map((module, index) => {
-          const isSelected = index === selectedModule;
-          const statusIcon = module.status === 'RUNNING' ? '●' : module.status === 'ERROR' ? '✗' : '○';
-
-          return (
-            <Box key={module.name} marginBottom={1}>
-              <Box width="100%">
-                <Text backgroundColor={isSelected ? 'blue' : undefined} color={isSelected ? 'white' : undefined}>
-                  {isSelected ? '❯' : ' '} {statusIcon} {module.name.padEnd(20)} {module.type.padEnd(10)}
-                </Text>
-                {module.pid && (
-                  <Text dimColor> PID {module.pid}</Text>
-                )}
-              </Box>
-
-              {/* Show Docker containers if selected and available */}
-              {isSelected && module.containers && module.containers.length > 0 && (
-                <Box marginLeft={4} marginTop={1} flexDirection="column">
-                  {module.containers.map((container) => (
-                    <Box key={container.name} marginBottom={0}>
-                      <Text dimColor>
-                        {'├─ '}
-                        <Text color={container.status === 'running' ? 'green' : 'gray'}>
-                          {container.status === 'running' ? '●' : '○'}
-                        </Text>
-                        {' '}{container.name}
-                        {container.ports.length > 0 && (
-                          <Text color="cyan"> {container.ports.join(', ')}</Text>
-                        )}
-                      </Text>
-                    </Box>
-                  ))}
-                </Box>
-              )}
-            </Box>
-          );
-        })}
+        {modules.map((module, index) => (
+          <ModuleRow
+            key={module.name}
+            module={module}
+            isSelected={index === selectedModule}
+          />
+        ))}
       </Box>
 
       {/* Action Bar */}
@@ -256,7 +251,7 @@ const Dashboard: React.FC = () => {
               <Text color="yellow">[3/R]</Text> Restart  {' '}
               <Text color="cyan">[M]</Text> Modules  {' '}
               <Text color="magenta">[E]</Text> Env  {' '}
-              <Text dimColor>[Q]</Text> Quit
+              <Text color="white">[Q]</Text> Quit
             </Text>
           </Box>
         </Box>
@@ -272,7 +267,60 @@ const Dashboard: React.FC = () => {
   );
 };
 
-const HelpScreen: React.FC = () => {
+// Separate ModuleRow component to prevent re-renders
+const ModuleRow: React.FC<{ module: ModuleStatus; isSelected: boolean }> = React.memo(({ module, isSelected }) => {
+  const statusIcon = module.status === 'RUNNING' ? '●' : module.status === 'ERROR' ? '✗' : '○';
+
+  return (
+    <Box marginBottom={1} flexDirection="column">
+      <Box width="100%">
+        <Text backgroundColor={isSelected ? 'blue' : undefined} color={isSelected ? 'white' : undefined}>
+          {isSelected ? '❯' : ' '} {statusIcon} {module.name.padEnd(20)} {module.type.padEnd(10)}
+        </Text>
+        {module.pid && (
+          <Text dimColor> PID {module.pid}</Text>
+        )}
+      </Box>
+
+      {/* Show Docker containers if selected and available */}
+      {isSelected && module.containers && module.containers.length > 0 && (
+        <Box marginLeft={4} marginTop={1} flexDirection="column">
+          {module.containers.map((container) => (
+            <Box key={container.name} marginBottom={0}>
+              <Text dimColor>
+                {'├─ '}
+                <Text color={container.status === 'running' ? 'green' : 'gray'}>
+                  {container.status === 'running' ? '●' : '○'}
+                </Text>
+                {' '}{container.name}
+                {container.ports.length > 0 && (
+                  <Text color="cyan"> {container.ports.join(', ')}</Text>
+                )}
+              </Text>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+});
+
+ModuleRow.displayName = 'ModuleRow';
+
+interface ScreenProps {
+  onBack: () => void;
+  onQuit: () => void;
+}
+
+const HelpScreen: React.FC<ScreenProps> = ({ onBack, onQuit }) => {
+  useInput((input, key) => {
+    if (input === 'q' || input === 'Q') {
+      onQuit();
+    } else if (input === 'b' || input === 'B' || key.escape) {
+      onBack();
+    }
+  });
+
   return (
     <Box flexDirection="column" padding={1}>
       <Box borderStyle="double" borderColor="cyan" padding={1} marginBottom={1}>
@@ -301,13 +349,21 @@ const HelpScreen: React.FC = () => {
         <Text>  H or ?     This help screen</Text>
         <Box marginTop={1} />
 
-        <Text dimColor>Press 'b' or ESC to go back</Text>
+        <Text dimColor>Press 'b' or ESC to go back • Press 'q' to quit</Text>
       </Box>
     </Box>
   );
 };
 
-const EnvScreen: React.FC = () => {
+const EnvScreen: React.FC<ScreenProps> = ({ onBack, onQuit }) => {
+  useInput((input, key) => {
+    if (input === 'q' || input === 'Q') {
+      onQuit();
+    } else if (input === 'b' || input === 'B' || key.escape) {
+      onBack();
+    }
+  });
+
   return (
     <Box flexDirection="column" padding={1}>
       <Box borderStyle="double" borderColor="magenta" padding={1} marginBottom={1}>
@@ -330,7 +386,7 @@ const EnvScreen: React.FC = () => {
         <Text dimColor>  canto env --check    Check for issues</Text>
         <Box marginTop={1} />
 
-        <Text dimColor>Press 'b' or ESC to go back</Text>
+        <Text dimColor>Press 'b' or ESC to go back • Press 'q' to quit</Text>
       </Box>
     </Box>
   );
