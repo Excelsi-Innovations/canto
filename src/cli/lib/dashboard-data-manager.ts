@@ -1,5 +1,6 @@
-import type { FSWatcher } from 'fs';
-import { watch } from 'fs';
+import type { FSWatcher } from 'chokidar';
+import chokidar from 'chokidar';
+import path from 'path';
 import { loadConfig } from '../../config/parser.js';
 import type { ProcessManager } from '../../processes/manager.js';
 import type { ModuleOrchestrator } from '../../modules/index.js';
@@ -33,6 +34,7 @@ export class DashboardDataManager {
   private updateTimer: NodeJS.Timer | null = null;
   private dirtyModules: Set<string> = new Set();
   private isInitialized: boolean = false;
+  private configChangeDebounceTimer: NodeJS.Timeout | null = null;
 
   constructor(
     orchestrator: ModuleOrchestrator,
@@ -85,6 +87,11 @@ export class DashboardDataManager {
     if (this.updateTimer) {
       clearInterval(this.updateTimer);
       this.updateTimer = null;
+    }
+
+    if (this.configChangeDebounceTimer) {
+      clearTimeout(this.configChangeDebounceTimer);
+      this.configChangeDebounceTimer = null;
     }
 
     this.subscribers.clear();
@@ -161,19 +168,40 @@ export class DashboardDataManager {
   }
 
   /**
-   * Watch config file for changes.
+   * Watch config file for changes using chokidar.
+   * More reliable and cross-platform than fs.watch.
    */
   private watchConfigFile(): void {
-    // Watch the entire directory (supports config file changes/renames)
     try {
-      this.configWatcher = watch(this.configPath, { recursive: false }, (eventType, filename) => {
-        if (!filename) return;
+      // Construct full config file path
+      const configPatterns = [
+        path.join(this.configPath, 'dev.config.yaml'),
+        path.join(this.configPath, 'dev.config.yml'),
+        path.join(this.configPath, 'canto.config.yaml'),
+        path.join(this.configPath, 'canto.config.yml'),
+        path.join(this.configPath, 'canto.config.json'),
+      ];
 
-        // Check if it's a config file
-        const isConfigFile = /^(canto|dev)\.(config|yml|yaml|json)$/.test(filename);
-        if (isConfigFile && eventType === 'change') {
-          this.handleConfigChange();
-        }
+      this.configWatcher = chokidar.watch(configPatterns, {
+        persistent: true,
+        ignoreInitial: true, // Don't trigger on initial add
+        awaitWriteFinish: {
+          stabilityThreshold: 100, // Wait for file to be stable
+          pollInterval: 50,
+        },
+      });
+
+      this.configWatcher.on('change', () => {
+        this.handleConfigChange();
+      });
+
+      this.configWatcher.on('add', () => {
+        // Config file was created
+        this.handleConfigChange();
+      });
+
+      this.configWatcher.on('error', () => {
+        // Silently ignore watcher errors
       });
     } catch (error) {
       // Silently fail if watching not supported
@@ -181,21 +209,30 @@ export class DashboardDataManager {
   }
 
   /**
-   * Handle config file changes.
+   * Handle config file changes with debouncing.
+   * Prevents multiple rapid reloads when file is saved.
    */
-  private async handleConfigChange(): Promise<void> {
-    try {
-      const newConfig = await loadConfig(this.configPath, true, true);
-      this.orchestrator.load(newConfig);
-
-      // Mark all modules as dirty
-      this.markAllDirty();
-
-      // Immediate update
-      await this.updateAllModules();
-    } catch {
-      // Ignore errors during reload
+  private handleConfigChange(): void {
+    // Clear existing debounce timer
+    if (this.configChangeDebounceTimer) {
+      clearTimeout(this.configChangeDebounceTimer);
     }
+
+    // Debounce config reload by 200ms
+    this.configChangeDebounceTimer = setTimeout(async () => {
+      try {
+        const newConfig = await loadConfig(this.configPath, true, true);
+        this.orchestrator.load(newConfig);
+
+        // Mark all modules as dirty
+        this.markAllDirty();
+
+        // Immediate update
+        await this.updateAllModules();
+      } catch {
+        // Ignore errors during reload
+      }
+    }, 200);
   }
 
   /**

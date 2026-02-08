@@ -1,6 +1,8 @@
 import { execSync } from 'child_process';
-import { resolve, dirname } from 'path';
+import { readFileSync, existsSync } from 'fs';
+import { dirname } from 'path';
 import pc from 'picocolors';
+import { dockerCache } from './docker-cache.js';
 
 /**
  * Docker container information
@@ -71,20 +73,25 @@ function parseContainerStatus(
 }
 
 /**
- * List all Docker containers for a specific Compose project
+ * List all Docker containers for a specific compose project
+ * Uses caching to avoid redundant docker ps calls
  *
- * @param composeFile - Path to docker-compose.yml
+ * @param composeFilePath - Path to docker-compose.yml
  * @returns Array of Docker containers
  */
-export function listContainers(composeFile: string): DockerContainer[] {
-  try {
-    const composeFilePath = resolve(composeFile);
-    const cwd = dirname(composeFilePath);
-    const composeCmd = detectDockerCompose();
+export function listContainers(composeFilePath: string): DockerContainer[] {
+  // Check cache first
+  const cached = dockerCache.get(composeFilePath);
+  if (cached) {
+    return cached;
+  }
 
-    // Get project name from docker-compose
+  try {
+    const cwd = dirname(composeFilePath);
+
+    // Get project name from docker-compose.yml
     const projectName = execSync(
-      `${composeCmd} -f ${composeFilePath} config --format json`,
+      `docker compose -f ${composeFilePath} config --format json`,
       { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
     );
 
@@ -96,6 +103,44 @@ export function listContainers(composeFile: string): DockerContainer[] {
       // Fallback to directory name
       project = dirname(composeFilePath).split(/[\\/]/).pop() || 'default';
     }
+
+    // List containers using docker ps with project label filter
+    const output = execSync(
+      `docker ps -a --filter "label=com.docker.compose.project=${project}" --format "{{.ID}}|{{.Names}}|{{.Status}}|{{.Image}}|{{.Ports}}|{{.CreatedAt}}"`,
+      { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
+    );
+
+    if (!output.trim()) {
+      dockerCache.set(composeFilePath, []);
+      return [];
+    }
+
+    const lines = output.trim().split('\n');
+    const containers = lines.map((line) => {
+      const parts = line.split('|');
+      const [id, name, status, image, ports, created] = parts.map((p) => p?.trim() ?? '');
+      return {
+        id: id || '',
+        name: name || '',
+        status: parseContainerStatus(status || ''),
+        image: image || '',
+        ports: ports ? ports.split(',').map((p) => p.trim()) : [],
+        created: created || '',
+      };
+    });
+
+    // Cache the result
+    dockerCache.set(composeFilePath, containers);
+    return containers;
+  } catch (error) {
+    // Silently fail if docker is not available or compose file not found
+    if (error instanceof Error) {
+      console.error(pc.dim(`Docker error: ${error.message}`));
+    }
+    dockerCache.set(composeFilePath, []);
+    return [];
+  }
+}
 
     // List containers using docker ps with project label filter
     const output = execSync(
@@ -186,9 +231,10 @@ export function getContainerLogsCommand(
 /**
  * Get the status icon and color for a container
  */
-export function getContainerStatusDisplay(
-  status: DockerContainer['status']
-): { icon: string; color: (str: string) => string } {
+export function getContainerStatusDisplay(status: DockerContainer['status']): {
+  icon: string;
+  color: (str: string) => string;
+} {
   switch (status) {
     case 'running':
       return { icon: '●', color: pc.green };

@@ -1,4 +1,5 @@
-import { promises as fs, watch, FSWatcher } from 'fs';
+import { promises as fs } from 'fs';
+import chokidar, { FSWatcher } from 'chokidar';
 
 export type LogSubscriber = (lines: string[]) => void;
 
@@ -120,16 +121,40 @@ export class LogTailer {
   }
 
   /**
-   * Watch file for changes and read new content.
+   * Watch file for changes using chokidar and read new content.
+   * More reliable and cross-platform than fs.watch.
    */
   private watchFile(): void {
     if (!this.filePath) return;
 
     try {
-      this.fileWatcher = watch(this.filePath, async (eventType) => {
-        if (eventType === 'change') {
-          await this.readNewContent();
-        }
+      this.fileWatcher = chokidar.watch(this.filePath, {
+        persistent: true,
+        ignoreInitial: true,
+        awaitWriteFinish: {
+          stabilityThreshold: 50, // Fast response for logs
+          pollInterval: 10,
+        },
+      });
+
+      this.fileWatcher.on('change', async () => {
+        await this.readNewContent();
+      });
+
+      // Handle log rotation
+      this.fileWatcher.on('unlink', () => {
+        this.lines = ['Log file was removed or rotated'];
+        this.notifySubscribers();
+      });
+
+      this.fileWatcher.on('add', async () => {
+        // File was re-created after rotation
+        await this.readLastLines();
+        this.notifySubscribers();
+      });
+
+      this.fileWatcher.on('error', () => {
+        // Silently fail on watcher errors
       });
     } catch (error) {
       // Silently fail if watching not supported
