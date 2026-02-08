@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
-import { execSync } from 'child_process';
-import path from 'path';
+import Spinner from 'ink-spinner';
 import Fuse from 'fuse.js';
 import { ProcessManager } from '../../processes/manager.js';
 import { ModuleOrchestrator } from '../../modules/index.js';
 import { DockerExecutor } from '../../modules/docker.js';
-import { createBar, formatMemory, type SystemResources } from '../../utils/resources.js';
+import { createBar, formatMemory, formatCPU, type SystemResources } from '../../utils/resources.js';
 import { getPreferencesManager } from '../../utils/preferences-manager.js';
 import { AsyncResourceMonitor } from '../lib/resource-monitor.js';
 import { DashboardDataManager } from '../lib/dashboard-data-manager.js';
@@ -14,21 +13,17 @@ import { ResourceHistory } from '../lib/resource-history.js';
 import { checkResourceAlerts, type ResourceAlert } from '../lib/resource-alerts.js';
 import { AutoRestartManager } from '../lib/auto-restart-manager.js';
 import type { ModuleStatus, Screen } from '../types.js';
-import { ModuleCard } from '../components/dashboard/ModuleCard.js';
-import { Sidebar } from '../components/dashboard/Sidebar.js';
-import { ModernHeader } from '../components/dashboard/ModernHeader.js';
+import { ModuleRow } from '../components/dashboard/ModuleRow.js';
 import { HelpScreen } from '../components/dashboard/HelpScreen.js';
 import { EnvScreen } from '../components/dashboard/EnvScreen.js';
 import { LogsScreen } from '../components/dashboard/LogsScreen.js';
 import { HistoryScreen } from '../components/dashboard/HistoryScreen.js';
 import { ModuleDetailsScreen } from '../components/dashboard/ModuleDetailsScreen.js';
 import { Toast, type ToastData } from '../components/dashboard/Toast.js';
-import { SplashScreen } from '../components/dashboard/SplashScreen.js';
 import { THEMES, type Theme } from '../../utils/preferences.js';
-import { getPoeticMessage } from '../lib/branding.js';
 
 const Dashboard: React.FC = () => {
-  const { exit } = useApp();
+  useApp(); // Just to trigger app context
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [selectedModule, setSelectedModule] = useState(0);
   const [modules, setModules] = useState<ModuleStatus[]>([]);
@@ -58,12 +53,13 @@ const Dashboard: React.FC = () => {
     completed: number;
     operation: string;
   } | null>(null);
-  const [forceUpdate, setForceUpdate] = useState(0);
+  const [forceUpdate, setForceUpdate] = useState(0); // Para forçar re-render quando necessário
 
   const [processManager] = useState(() => new ProcessManager());
   const [orchestrator] = useState(() => new ModuleOrchestrator(processManager));
   const [dockerExecutor] = useState(() => new DockerExecutor(processManager));
 
+  // Initialize optimized data managers
   const [resourceMonitor] = useState(() => new AsyncResourceMonitor());
   const [dataManager] = useState(
     () => new DashboardDataManager(orchestrator, processManager, dockerExecutor)
@@ -72,95 +68,86 @@ const Dashboard: React.FC = () => {
   const [resourceHistory] = useState(() => new ResourceHistory(30));
   const [autoRestartManager] = useState(() => new AutoRestartManager());
 
+  // Use refs to track shown alerts to prevent infinite loops
   const shownCriticalAlerts = useRef<Set<string>>(new Set());
   const shownAutoRestartAlerts = useRef<Set<string>>(new Set());
 
-  // System info for status bar (computed once at mount)
-  const [gitBranch] = useState<string>(() => {
-    try {
-      return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
-    } catch {
-      return '';
-    }
-  });
-  const cwdName = useMemo(() => path.basename(process.cwd()), []);
-  const nodeVersion = process.version;
-
+  // Get current theme - recalcula quando forceUpdate muda
   const theme: Theme = useMemo(() => {
     const themeName = prefsManager.getTheme();
     return THEMES[themeName] || THEMES['default']!;
   }, [forceUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Debounce search query to reduce re-renders
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
-    }, 300);
+    }, 300); // 300ms debounce
+
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Reset lastKey after a timeout (for 'gg' vim keybinding)
   useEffect(() => {
     if (lastKey) {
       const timer = setTimeout(() => {
         setLastKey(null);
-      }, 500);
+      }, 500); // 500ms window to press second 'g'
+
       return () => clearTimeout(timer);
     }
     return undefined;
   }, [lastKey]);
 
+  // Auto-dismiss toasts after 3 seconds
   useEffect(() => {
     if (toasts.length > 0) {
       const timer = setTimeout(() => {
-        setToasts((prev) => prev.slice(1));
-      }, 1500); // Reduced from 3000ms to 1500ms
+        setToasts((prev) => prev.slice(1)); // Remove oldest toast
+      }, 3000);
+
       return () => clearTimeout(timer);
     }
     return undefined;
   }, [toasts]);
 
+  // Helper function to show toast notifications
   const showToast = useCallback((message: string, type: ToastData['type']) => {
     const newToast: ToastData = {
       id: `${Date.now()}-${Math.random()}`,
       message,
       type,
     };
-    setToasts((prev) => {
-      // Remove duplicates of the same message to avoid spam
-      const filtered = prev.filter((t) => t.message !== message);
-      // Keep only the last 2 toasts + the new one (max 3 visible)
-      const trimmed = filtered.slice(-2);
-      return [...trimmed, newToast];
-    });
+    setToasts((prev) => [...prev, newToast]);
   }, []);
 
+  // Force update helper - triggers re-render and dataManager update
   const triggerUpdate = useCallback(() => {
     setForceUpdate((prev) => prev + 1);
     dataManager.forceUpdate();
   }, [dataManager]);
 
+  // System resources monitoring (async, non-blocking)
   useEffect(() => {
     resourceMonitor.start();
+
     const unsubscribe = resourceMonitor.subscribe((resources) => {
       setSystemResources(resources);
+      // Track resource history for sparklines
       resourceHistory.addDataPoint(resources.cpuUsage, resources.usedMemory);
     });
+
     return () => {
       unsubscribe();
       resourceMonitor.stop();
     };
   }, [resourceMonitor, resourceHistory]);
 
+  // Module status monitoring (smart caching & file watching)
   useEffect(() => {
     const initializeData = async () => {
       try {
-        // Show splash screen for at least 2.5s so users can see the Monolith
-        const [result] = await Promise.allSettled([
-          dataManager.initialize(),
-          new Promise((resolve) => setTimeout(resolve, 2500)),
-        ]);
-        if (result.status === 'rejected') {
-          throw result.reason;
-        }
+        await dataManager.initialize();
         setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -173,12 +160,14 @@ const Dashboard: React.FC = () => {
     const unsubscribe = dataManager.subscribe((moduleStatuses) => {
       setModules(moduleStatuses);
 
+      // Check for resource alerts
       const newAlerts: ResourceAlert[] = [];
       moduleStatuses.forEach((module) => {
         const alerts = checkResourceAlerts(module);
         newAlerts.push(...alerts);
       });
 
+      // Show toast for new critical alerts (only once per alert)
       newAlerts.forEach((alert) => {
         if (alert.level === 'critical') {
           const alertKey = `${alert.moduleName}-${alert.type}`;
@@ -191,6 +180,8 @@ const Dashboard: React.FC = () => {
           }
         }
       });
+
+      // newAlerts não é mais armazenado em estado, apenas usado para verificar
     });
 
     return () => {
@@ -199,13 +190,16 @@ const Dashboard: React.FC = () => {
     };
   }, [dataManager, showToast]);
 
+  // Auto-restart monitoring for failed modules
   useEffect(() => {
     modules.forEach((module) => {
       const state = autoRestartManager.getState(module.name);
 
+      // If module is in ERROR state and not already restarting
       if (module.status === 'ERROR' && (!state || !state.isRestarting)) {
         const restartKey = `${module.name}-restart`;
 
+        // Only register failure once per error occurrence
         if (!shownAutoRestartAlerts.current.has(restartKey)) {
           const shouldRestart = autoRestartManager.registerFailure(module.name);
 
@@ -220,19 +214,19 @@ const Dashboard: React.FC = () => {
                 showToast(`✓ Auto-restarted ${module.name}`, 'success');
                 dataManager.markDirty(module.name);
                 triggerUpdate();
+                // Remove from shown alerts so it can show again if needed
                 shownAutoRestartAlerts.current.delete(restartKey);
               },
               (delay) => {
-                const moduleType = module.type || 'default';
-                const poeticMsg = getPoeticMessage('autoRestart', moduleType);
                 const seconds = Math.ceil(delay / 1000);
-                showToast(`${poeticMsg} (${seconds}s)`, 'info');
+                showToast(`🔄 Auto-restarting ${module.name} in ${seconds}s...`, 'info');
               }
             );
           }
         }
       }
 
+      // If module is RUNNING, reset auto-restart state and clear shown alerts
       if (module.status === 'RUNNING' && state) {
         autoRestartManager.resetState(module.name);
         shownAutoRestartAlerts.current.delete(`${module.name}-restart`);
@@ -240,30 +234,37 @@ const Dashboard: React.FC = () => {
     });
   }, [modules, autoRestartManager, orchestrator, prefsManager, showToast, triggerUpdate]);
 
+  // Cleanup auto-restart on unmount
   useEffect(() => {
     return () => {
       autoRestartManager.cleanup();
     };
   }, [autoRestartManager]);
 
+  // Fuzzy search with Fuse.js (better than simple includes)
   const filteredModules = useMemo(() => {
     if (!debouncedSearchQuery) return modules;
+
     const fuse = new Fuse(modules, {
       keys: ['name', 'type'],
-      threshold: 0.4,
+      threshold: 0.4, // 0 = exact match, 1 = match anything
       ignoreLocation: true,
     });
+
     const results = fuse.search(debouncedSearchQuery);
     return results.map((result) => result.item);
   }, [modules, debouncedSearchQuery]);
 
+  // Smart sorting: favorites first, then RUNNING status, then alphabetically
   const sortedModules = useMemo(() => {
     return [...filteredModules].sort((a, b) => {
+      // 1. Sort by favorite status (favorites first)
       const aFav = prefsManager.isFavorite(a.name);
       const bFav = prefsManager.isFavorite(b.name);
       if (aFav && !bFav) return -1;
       if (!aFav && bFav) return 1;
 
+      // 2. Sort by status (RUNNING > STARTING/STOPPING > STOPPED)
       const statusPriority: Record<string, number> = {
         RUNNING: 3,
         STARTING: 2,
@@ -274,6 +275,7 @@ const Dashboard: React.FC = () => {
       const bPriority = statusPriority[b.status] || 0;
       if (aPriority !== bPriority) return bPriority - aPriority;
 
+      // 3. Sort alphabetically by name
       return a.name.localeCompare(b.name);
     });
   }, [filteredModules, prefsManager]);
@@ -282,13 +284,8 @@ const Dashboard: React.FC = () => {
     async (action: 'start' | 'stop' | 'restart', moduleName: string) => {
       if (isProcessing) return;
 
-      // Find the module to get its type for poetic messages
-      const targetModule = modules.find((m) => m.name === moduleName);
-      const moduleType = targetModule?.type || 'default';
-
       try {
         setIsProcessing(true);
-        showToast(getPoeticMessage(action, moduleType), 'info');
         if (action === 'start') {
           await orchestrator.start(moduleName);
           prefsManager.addToHistory(`start ${moduleName}`, moduleName, true);
@@ -302,18 +299,20 @@ const Dashboard: React.FC = () => {
           prefsManager.addToHistory(`restart ${moduleName}`, moduleName, true);
           showToast(`✓ Restarted ${moduleName}`, 'success');
         }
+        // Mark module as dirty for immediate update
         dataManager.markDirty(moduleName);
+        // Force update immediately (async, non-blocking)
         triggerUpdate();
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        showToast(getPoeticMessage('error', moduleType), 'error');
         setError(errorMsg);
+        showToast(`✗ Failed to ${action} ${moduleName}: ${errorMsg}`, 'error');
         prefsManager.addToHistory(`${action} ${moduleName}`, moduleName, false);
       } finally {
         setIsProcessing(false);
       }
     },
-    [orchestrator, isProcessing, modules, dataManager, prefsManager, showToast, triggerUpdate]
+    [orchestrator, isProcessing, dataManager, prefsManager, showToast, triggerUpdate]
   );
 
   const executeBulkAction = useCallback(
@@ -354,6 +353,7 @@ const Dashboard: React.FC = () => {
           'success'
         );
 
+        // Clear selection after bulk action
         setSelectedModules(new Set());
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
@@ -371,9 +371,11 @@ const Dashboard: React.FC = () => {
       const module = sortedModules[selectedModule];
       if (!module || isProcessing) return;
 
+      // Destructive actions require confirmation
       if (action === 'stop' || action === 'restart') {
         setConfirmAction({ action, moduleName: module.name });
       } else {
+        // Start action doesn't need confirmation
         executeModuleAction(action, module.name);
       }
     },
@@ -383,8 +385,11 @@ const Dashboard: React.FC = () => {
   const handleBulkAction = useCallback(
     (action: 'start' | 'stop' | 'restart') => {
       if (selectedModules.size === 0 || isProcessing) return;
+
       const moduleNames = Array.from(selectedModules);
       const bulkAction = `bulk-${action}` as const;
+
+      // All bulk actions require confirmation
       setConfirmAction({ action: bulkAction, moduleNames });
     },
     [selectedModules, isProcessing]
@@ -393,6 +398,7 @@ const Dashboard: React.FC = () => {
   const toggleModuleSelection = useCallback(() => {
     const module = sortedModules[selectedModule];
     if (!module) return;
+
     setSelectedModules((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(module.name)) {
@@ -415,8 +421,9 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const handleExit = useCallback(() => {
-    exit();
-  }, [exit]);
+    // Force exit immediately
+    process.exit(0);
+  }, []);
 
   const handleInput = useCallback(
     (
@@ -432,6 +439,7 @@ const Dashboard: React.FC = () => {
         return?: boolean;
       }
     ) => {
+      // Global quit - works from any screen
       if (input === 'q' || input === 'Q') {
         handleExit();
         return;
@@ -439,11 +447,14 @@ const Dashboard: React.FC = () => {
 
       if (key.escape) {
         if (confirmAction) {
+          // Cancel confirmation
           setConfirmAction(null);
         } else if (selectedModules.size > 0) {
+          // Clear selection
           clearSelection();
           showToast('Selection cleared', 'info');
         } else if (searchMode) {
+          // Exit search mode
           setSearchMode(false);
           setSearchQuery('');
           setSelectedModule(0);
@@ -455,8 +466,10 @@ const Dashboard: React.FC = () => {
         return;
       }
 
+      // Handle confirmation modal
       if (confirmAction) {
         if (input === 'y' || input === 'Y') {
+          // Confirm action
           if (confirmAction.action.startsWith('bulk-')) {
             const bulkAction = confirmAction.action.replace('bulk-', '') as
               | 'start'
@@ -471,6 +484,7 @@ const Dashboard: React.FC = () => {
           }
           setConfirmAction(null);
         } else if (input === 'n' || input === 'N') {
+          // Cancel action
           setConfirmAction(null);
         }
         return;
@@ -478,21 +492,26 @@ const Dashboard: React.FC = () => {
 
       if (screen === 'dashboard') {
         if (searchMode) {
+          // In search mode - handle text input
           if (key.backspace || key.delete) {
             setSearchQuery(searchQuery.slice(0, -1));
           } else if (input && input.length === 1 && /[a-zA-Z0-9-_]/.test(input)) {
             setSearchQuery(searchQuery + input);
           }
         } else {
+          // Normal navigation mode
           if (key.upArrow && selectedModule > 0) {
             setSelectedModule(selectedModule - 1);
           } else if (key.downArrow && selectedModule < sortedModules.length - 1) {
             setSelectedModule(selectedModule + 1);
           } else if (input === 'k' && selectedModule > 0) {
+            // Vim: k = up
             setSelectedModule(selectedModule - 1);
           } else if (input === 'j' && selectedModule < sortedModules.length - 1) {
+            // Vim: j = down
             setSelectedModule(selectedModule + 1);
           } else if (input === 'g') {
+            // Vim: gg = jump to top
             if (lastKey === 'g') {
               setSelectedModule(0);
               setLastKey(null);
@@ -500,19 +519,25 @@ const Dashboard: React.FC = () => {
               setLastKey('g');
             }
           } else if (input === 'G') {
+            // Vim: G = jump to bottom
             setSelectedModule(sortedModules.length - 1);
           } else if (input === '/') {
             setSearchMode(true);
             setSearchQuery('');
           } else if (input === ' ') {
+            // Space = toggle selection
             toggleModuleSelection();
           } else if (key.ctrl && input === 'a') {
+            // Ctrl+A = select all filtered
             selectAllFiltered();
           } else if (key.shift && input === 'S') {
+            // Shift+S = bulk start
             handleBulkAction('start');
           } else if (key.shift && input === 'X') {
+            // Shift+X = bulk stop
             handleBulkAction('stop');
           } else if (key.shift && input === 'R') {
+            // Shift+R = bulk restart
             handleBulkAction('restart');
           } else if (input === '1' || input === 's') {
             handleModuleAction('start');
@@ -521,6 +546,7 @@ const Dashboard: React.FC = () => {
           } else if (input === '3' || input === 'r') {
             handleModuleAction('restart');
           } else if (input === 'f' || input === 'F') {
+            // Toggle favorite for selected module
             const module = sortedModules[selectedModule];
             if (module) {
               if (prefsManager.isFavorite(module.name)) {
@@ -530,6 +556,7 @@ const Dashboard: React.FC = () => {
                 prefsManager.addFavorite(module.name);
                 showToast(`★ Added ${module.name} to favorites`, 'success');
               }
+              // Force re-render to update the star icon and sorting
               triggerUpdate();
             }
           } else if (input === 'm' || input === 'M') {
@@ -543,18 +570,22 @@ const Dashboard: React.FC = () => {
           } else if (input === 'h' || input === 'H' || input === '?') {
             setScreen('help');
           } else if (input === 't' || input === 'T') {
+            // Cycle through themes
             const themeNames = Object.keys(THEMES);
             const currentIndex = themeNames.indexOf(prefsManager.getTheme());
             const nextIndex = (currentIndex + 1) % themeNames.length;
             const nextTheme = themeNames[nextIndex];
             prefsManager.setTheme(nextTheme!);
             showToast(`Theme changed to ${THEMES[nextTheme!]!.name}`, 'info');
+            // Force re-render
             triggerUpdate();
           } else if (key.return) {
+            // Enter = show module details
             setScreen('details');
           }
         }
       } else {
+        // Any screen can go back with 'b'
         if (input === 'b' || input === 'B') {
           setScreen('dashboard');
         }
@@ -585,14 +616,24 @@ const Dashboard: React.FC = () => {
 
   useInput(handleInput);
 
+  // Memoize computed values to prevent re-renders
   const stats = useMemo(() => {
     const runningCount = modules.filter((m) => m.status === 'RUNNING').length;
     const stoppedCount = modules.filter((m) => m.status === 'STOPPED').length;
     return { runningCount, stoppedCount, total: modules.length };
   }, [modules]);
 
-  if (loading) {
-    return <SplashScreen theme={theme} />;
+  if (loading && modules.length === 0) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box>
+          <Text color="cyan">
+            <Spinner type="dots" />
+            {' Loading Canto...'}
+          </Text>
+        </Box>
+      </Box>
+    );
   }
 
   if (error) {
@@ -658,150 +699,159 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Modern Dashboard with Sidebar Layout
+  // Main Dashboard
   return (
-    <Box flexDirection="row" width="100%">
-      {/* Sidebar */}
-      <Sidebar
-        stats={stats}
-        selectedScreen={screen}
-        onNavigate={(newScreen) => setScreen(newScreen)}
-        theme={theme}
-      />
-
-      {/* Main Content Area */}
-      <Box flexDirection="column" flexGrow={1} paddingX={1} paddingY={0}>
-        {/* Modern Header */}
-        <ModernHeader
-          systemResources={systemResources}
-          resourceHistory={resourceHistory}
-          isProcessing={isProcessing}
-          theme={theme}
-        />
-
-        {/* Search Bar */}
-        {searchMode && (
-          <Box borderStyle="round" borderColor={theme.colors.primary} padding={1} marginBottom={1}>
-            <Text>
-              <Text color={theme.colors.primary}>🔍 Search: </Text>
-              <Text bold>{searchQuery}</Text>
-              <Text color={theme.colors.primary}>_</Text>
-              <Text dimColor> (ESC to clear)</Text>
+    <Box flexDirection="column" padding={1}>
+      {/* Header */}
+      <Box
+        borderStyle="double"
+        borderColor={theme.colors.headerBorder}
+        padding={1}
+        marginBottom={1}
+      >
+        <Box flexDirection="column" width="100%">
+          <Text bold color={theme.colors.primary}>
+            🎵 CANTO DEVELOPMENT DASHBOARD
+          </Text>
+          <Box marginTop={1} flexDirection="column">
+            <Text dimColor>
+              {stats.runningCount} Running • {stats.stoppedCount} Stopped • {stats.total} Total
+              {isProcessing && <Text color={theme.colors.warning}> • Processing...</Text>}
             </Text>
+            <Box marginTop={1} flexDirection="column">
+              <Text dimColor>
+                <Text bold>CPU:</Text> {createBar(systemResources.cpuUsage, 100, 15)}{' '}
+                {formatCPU(systemResources.cpuUsage)}
+                <Text color={theme.colors.info}> {resourceHistory.getCpuSparkline(20)}</Text>
+              </Text>
+              <Text dimColor>
+                <Text bold>RAM:</Text>{' '}
+                {createBar(systemResources.usedMemory, systemResources.totalMemory, 15)}{' '}
+                {formatMemory(systemResources.usedMemory)}/
+                {formatMemory(systemResources.totalMemory)}
+                <Text color={theme.colors.primary}> {resourceHistory.getMemorySparkline(20)}</Text>
+              </Text>
+            </Box>
           </Box>
-        )}
+        </Box>
+      </Box>
 
-        {/* Modules */}
-        <Box
-          borderStyle="round"
-          borderColor={theme.colors.border}
-          paddingX={1}
-          paddingY={0}
-          marginBottom={1}
-          flexDirection="column"
-          flexGrow={1}
-        >
-          <Box marginBottom={1}>
-            <Text bold color={theme.colors.warning}>
-              📦 {sortedModules.length} Module{sortedModules.length !== 1 ? 's' : ''}
-              {selectedModules.size > 0 && (
-                <Text color={theme.colors.info}> • {selectedModules.size} selected</Text>
-              )}
-            </Text>
-          </Box>
-
-          {sortedModules.length === 0 ? (
-            <Text dimColor>No modules match "{searchQuery}"</Text>
-          ) : (
-            sortedModules.map((module, index) => (
-              <ModuleCard
-                key={module.name}
-                module={module}
-                isSelected={index === selectedModule}
-                isFavorite={prefsManager.isFavorite(module.name)}
-                isChecked={selectedModules.has(module.name)}
-                autoRestartState={autoRestartManager.getState(module.name)}
-                theme={theme}
-              />
-            ))
+      {/* Module List */}
+      <Box
+        borderStyle="round"
+        borderColor={theme.colors.border}
+        padding={1}
+        marginBottom={1}
+        flexDirection="column"
+      >
+        <Box marginBottom={1} flexDirection="column">
+          <Text bold color={theme.colors.warning}>
+            📦 MODULES
+          </Text>
+          {searchMode && (
+            <Box marginTop={1}>
+              <Text>
+                <Text color={theme.colors.info}>Search: </Text>
+                <Text>{searchQuery}</Text>
+                <Text color={theme.colors.info}>_</Text>
+                <Text dimColor> (ESC to clear)</Text>
+              </Text>
+            </Box>
+          )}
+          {searchQuery && !searchMode && (
+            <Box marginTop={1}>
+              <Text dimColor>
+                Filtered: {sortedModules.length}/{modules.length} modules
+                <Text color="cyan"> (Press / to search again)</Text>
+              </Text>
+            </Box>
           )}
         </Box>
 
-        {/* Unified Status Bar */}
-        <Box borderStyle="round" borderColor={theme.colors.border} paddingX={1} marginBottom={1}>
+        {sortedModules.length === 0 ? (
+          <Text dimColor>No modules match "{searchQuery}"</Text>
+        ) : (
+          sortedModules.map((module, index) => (
+            <ModuleRow
+              key={module.name}
+              module={module}
+              isSelected={index === selectedModule}
+              searchQuery={searchQuery}
+              isFavorite={prefsManager.isFavorite(module.name)}
+              autoRestartState={autoRestartManager.getState(module.name)}
+              isChecked={selectedModules.has(module.name)}
+            />
+          ))
+        )}
+      </Box>
+
+      {/* Action Bar */}
+      <Box borderStyle="round" borderColor={theme.colors.border} padding={1} marginBottom={1}>
+        <Box flexDirection="column" width="100%">
+          <Text bold color={theme.colors.success}>
+            ⚡ ACTIONS
+          </Text>
           {selectedModules.size > 0 ? (
-            <Box justifyContent="space-between" width="100%">
-              <Box>
-                <Text bold color={theme.colors.info}>
-                  {selectedModules.size} selected
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.success} color="black" bold>
-                  {' [S] Start '}
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.error} color="black" bold>
-                  {' [X] Stop '}
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.warning} color="black" bold>
-                  {' [R] Restart '}
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.muted} color="black">
-                  {' [Esc] Clear '}
+            <>
+              <Box marginTop={1}>
+                <Text color={theme.colors.info}>
+                  {selectedModules.size} module{selectedModules.size > 1 ? 's' : ''} selected
                 </Text>
               </Box>
-            </Box>
+              <Box marginTop={1}>
+                <Text>
+                  <Text color={theme.colors.success}>[Shift+S]</Text> Start All{' '}
+                  <Text color={theme.colors.error}>[Shift+X]</Text> Stop All{' '}
+                  <Text color={theme.colors.warning}>[Shift+R]</Text> Restart All{' '}
+                  <Text color="gray">[ESC]</Text> Clear
+                </Text>
+              </Box>
+            </>
           ) : (
-            <Box justifyContent="space-between" width="100%">
-              <Box>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.primary}>
-                  {' [↕] '}
-                </Text>
-                <Text color={theme.colors.muted}> Nav </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.success}>
-                  {' [↵] '}
-                </Text>
-                <Text color={theme.colors.muted}> Open </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.warning}>
-                  {' [/] '}
-                </Text>
-                <Text color={theme.colors.muted}> Search </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.info}>
-                  {' [F] '}
-                </Text>
-                <Text color={theme.colors.muted}> Fav </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.primary}>
-                  {' [T] '}
-                </Text>
-                <Text color={theme.colors.muted}> Theme</Text>
-              </Box>
-              <Box>
-                <Text dimColor color={theme.colors.muted}>
-                  {nodeVersion}
-                  {cwdName ? ` │ ${cwdName}` : ''}
-                  {gitBranch ? ` │ ${gitBranch}` : ''}
+            <>
+              <Box marginTop={1}>
+                <Text>
+                  <Text color={theme.colors.success}>[1/s]</Text> Start{' '}
+                  <Text color={theme.colors.error}>[2/x]</Text> Stop{' '}
+                  <Text color={theme.colors.warning}>[3/r]</Text> Restart{' '}
+                  <Text color={theme.colors.warning}>[F]</Text> Favorite
                 </Text>
               </Box>
-            </Box>
+              <Box marginTop={0}>
+                <Text>
+                  <Text color={theme.colors.info}>[Space]</Text> Select{' '}
+                  <Text color={theme.colors.info}>[Ctrl+A]</Text> Select All{' '}
+                  <Text color={theme.colors.warning}>[L]</Text> Logs{' '}
+                  <Text color={theme.colors.info}>[I]</Text> History
+                </Text>
+              </Box>
+            </>
           )}
         </Box>
+      </Box>
 
-        {/* Toast Notifications */}
-        {toasts.length > 0 && (
-          <Box flexDirection="column">
-            {toasts.map((toast) => (
-              <Box key={toast.id} marginBottom={0}>
-                <Toast toast={toast} />
-              </Box>
-            ))}
-          </Box>
-        )}
+      {/* Status Bar */}
+      <Box borderStyle="single" borderColor={theme.colors.border} padding={1}>
+        <Text dimColor>
+          ↑↓ to navigate • Enter for details • '/' to search • Press 'h' for help • 'q' to quit
+        </Text>
+      </Box>
 
-        {/* Confirmation Modal */}
-        {confirmAction && (
-          <Box borderStyle="double" borderColor="yellow" padding={2} marginTop={1}>
+      {/* Toast Notifications */}
+      {toasts.length > 0 && (
+        <Box marginTop={1} flexDirection="column">
+          {toasts.map((toast) => (
+            <Box key={toast.id} marginBottom={1}>
+              <Toast toast={toast} />
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmAction && (
+        <Box marginTop={1}>
+          <Box borderStyle="double" borderColor="yellow" padding={1}>
             <Box flexDirection="column">
               <Text bold color="yellow">
                 ⚠ Confirm Action
@@ -825,6 +875,7 @@ const Dashboard: React.FC = () => {
                     <Text bold color={confirmAction.action === 'stop' ? 'red' : 'yellow'}>
                       {confirmAction.action}
                     </Text>{' '}
+                    module{' '}
                     <Text bold color="cyan">
                       {confirmAction.moduleName}
                     </Text>
@@ -834,71 +885,48 @@ const Dashboard: React.FC = () => {
               </Box>
               <Box marginTop={1}>
                 <Text dimColor>
-                  <Text color="green">[Y]</Text> Confirm • <Text color="red">[N]</Text> Cancel
+                  Press <Text color="green">Y</Text> to confirm • Press <Text color="red">N</Text>{' '}
+                  or <Text color="red">ESC</Text> to cancel
                 </Text>
               </Box>
             </Box>
           </Box>
-        )}
+        </Box>
+      )}
 
-        {/* Bulk Progress */}
-        {bulkOperationProgress && (
-          <Box borderStyle="double" borderColor="cyan" padding={2} marginTop={1}>
+      {/* Bulk Operation Progress */}
+      {bulkOperationProgress && (
+        <Box marginTop={1}>
+          <Box borderStyle="double" borderColor="cyan" padding={1}>
             <Box flexDirection="column">
               <Text bold color="cyan">
-                🔄 {bulkOperationProgress.operation}ing modules...
+                🔄 Bulk Operation in Progress
               </Text>
               <Box marginTop={1}>
                 <Text>
-                  Progress: {bulkOperationProgress.completed}/{bulkOperationProgress.total}
+                  {bulkOperationProgress.operation}ing modules:{' '}
+                  <Text bold color="yellow">
+                    {bulkOperationProgress.completed}/{bulkOperationProgress.total}
+                  </Text>
                 </Text>
               </Box>
               <Box marginTop={1}>
                 <Text dimColor>
-                  {createBar(bulkOperationProgress.completed, bulkOperationProgress.total, 30)}
+                  {createBar(bulkOperationProgress.completed, bulkOperationProgress.total, 30)}{' '}
+                  {Math.round(
+                    (bulkOperationProgress.completed / bulkOperationProgress.total) * 100
+                  )}
+                  %
                 </Text>
               </Box>
             </Box>
           </Box>
-        )}
-      </Box>
+        </Box>
+      )}
     </Box>
   );
 };
 
 export async function dashboardCommand(): Promise<void> {
-  // Enter alternate screen buffer (like vim/htop)
-  process.stdout.write('\x1b[?1049h');
-  // Hide cursor
-  process.stdout.write('\x1b[?25l');
-
-  let cleanupCalled = false;
-  const cleanup = () => {
-    if (cleanupCalled) return;
-    cleanupCalled = true;
-    // Show cursor
-    process.stdout.write('\x1b[?25h');
-    // Leave alternate screen buffer
-    process.stdout.write('\x1b[?1049l');
-  };
-
-  // Ensure cleanup on exit signals
-  const exitHandler = () => {
-    cleanup();
-    process.exit(0);
-  };
-
-  process.on('SIGINT', exitHandler);
-  process.on('SIGTERM', exitHandler);
-
-  try {
-    const instance = render(<Dashboard />);
-    await instance.waitUntilExit();
-  } finally {
-    cleanup();
-    // Force exit after 500ms if cleanup is slow
-    setTimeout(() => {
-      process.exit(0);
-    }, 500);
-  }
+  render(<Dashboard />);
 }

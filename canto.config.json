@@ -1,0 +1,14 @@
+{
+  "modules": [
+    {
+      "name": "test-module",
+      "type": "workspace",
+      "enabled": true,
+      "path": "./test",
+      "commands": {
+        "start": "echo 'Test module running' && sleep 3600",
+        "stop": "echo 'Stopping test module'"
+      }
+    }
+  ]
+}

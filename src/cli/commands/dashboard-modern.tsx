@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
-import { execSync } from 'child_process';
-import path from 'path';
+import Spinner from 'ink-spinner';
 import Fuse from 'fuse.js';
 import { ProcessManager } from '../../processes/manager.js';
 import { ModuleOrchestrator } from '../../modules/index.js';
@@ -23,12 +22,10 @@ import { LogsScreen } from '../components/dashboard/LogsScreen.js';
 import { HistoryScreen } from '../components/dashboard/HistoryScreen.js';
 import { ModuleDetailsScreen } from '../components/dashboard/ModuleDetailsScreen.js';
 import { Toast, type ToastData } from '../components/dashboard/Toast.js';
-import { SplashScreen } from '../components/dashboard/SplashScreen.js';
 import { THEMES, type Theme } from '../../utils/preferences.js';
-import { getPoeticMessage } from '../lib/branding.js';
 
 const Dashboard: React.FC = () => {
-  const { exit } = useApp();
+  useApp();
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [selectedModule, setSelectedModule] = useState(0);
   const [modules, setModules] = useState<ModuleStatus[]>([]);
@@ -75,17 +72,6 @@ const Dashboard: React.FC = () => {
   const shownCriticalAlerts = useRef<Set<string>>(new Set());
   const shownAutoRestartAlerts = useRef<Set<string>>(new Set());
 
-  // System info for status bar (computed once at mount)
-  const [gitBranch] = useState<string>(() => {
-    try {
-      return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
-    } catch {
-      return '';
-    }
-  });
-  const cwdName = useMemo(() => path.basename(process.cwd()), []);
-  const nodeVersion = process.version;
-
   const theme: Theme = useMemo(() => {
     const themeName = prefsManager.getTheme();
     return THEMES[themeName] || THEMES['default']!;
@@ -112,7 +98,7 @@ const Dashboard: React.FC = () => {
     if (toasts.length > 0) {
       const timer = setTimeout(() => {
         setToasts((prev) => prev.slice(1));
-      }, 1500); // Reduced from 3000ms to 1500ms
+      }, 3000);
       return () => clearTimeout(timer);
     }
     return undefined;
@@ -124,13 +110,7 @@ const Dashboard: React.FC = () => {
       message,
       type,
     };
-    setToasts((prev) => {
-      // Remove duplicates of the same message to avoid spam
-      const filtered = prev.filter((t) => t.message !== message);
-      // Keep only the last 2 toasts + the new one (max 3 visible)
-      const trimmed = filtered.slice(-2);
-      return [...trimmed, newToast];
-    });
+    setToasts((prev) => [...prev, newToast]);
   }, []);
 
   const triggerUpdate = useCallback(() => {
@@ -153,14 +133,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const initializeData = async () => {
       try {
-        // Show splash screen for at least 2.5s so users can see the Monolith
-        const [result] = await Promise.allSettled([
-          dataManager.initialize(),
-          new Promise((resolve) => setTimeout(resolve, 2500)),
-        ]);
-        if (result.status === 'rejected') {
-          throw result.reason;
-        }
+        await dataManager.initialize();
         setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -223,10 +196,8 @@ const Dashboard: React.FC = () => {
                 shownAutoRestartAlerts.current.delete(restartKey);
               },
               (delay) => {
-                const moduleType = module.type || 'default';
-                const poeticMsg = getPoeticMessage('autoRestart', moduleType);
                 const seconds = Math.ceil(delay / 1000);
-                showToast(`${poeticMsg} (${seconds}s)`, 'info');
+                showToast(`🔄 Auto-restarting ${module.name} in ${seconds}s...`, 'info');
               }
             );
           }
@@ -282,13 +253,8 @@ const Dashboard: React.FC = () => {
     async (action: 'start' | 'stop' | 'restart', moduleName: string) => {
       if (isProcessing) return;
 
-      // Find the module to get its type for poetic messages
-      const targetModule = modules.find((m) => m.name === moduleName);
-      const moduleType = targetModule?.type || 'default';
-
       try {
         setIsProcessing(true);
-        showToast(getPoeticMessage(action, moduleType), 'info');
         if (action === 'start') {
           await orchestrator.start(moduleName);
           prefsManager.addToHistory(`start ${moduleName}`, moduleName, true);
@@ -306,14 +272,14 @@ const Dashboard: React.FC = () => {
         triggerUpdate();
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        showToast(getPoeticMessage('error', moduleType), 'error');
         setError(errorMsg);
+        showToast(`✗ Failed to ${action} ${moduleName}: ${errorMsg}`, 'error');
         prefsManager.addToHistory(`${action} ${moduleName}`, moduleName, false);
       } finally {
         setIsProcessing(false);
       }
     },
-    [orchestrator, isProcessing, modules, dataManager, prefsManager, showToast, triggerUpdate]
+    [orchestrator, isProcessing, dataManager, prefsManager, showToast, triggerUpdate]
   );
 
   const executeBulkAction = useCallback(
@@ -415,8 +381,8 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const handleExit = useCallback(() => {
-    exit();
-  }, [exit]);
+    process.exit(0);
+  }, []);
 
   const handleInput = useCallback(
     (
@@ -591,8 +557,17 @@ const Dashboard: React.FC = () => {
     return { runningCount, stoppedCount, total: modules.length };
   }, [modules]);
 
-  if (loading) {
-    return <SplashScreen theme={theme} />;
+  if (loading && modules.length === 0) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box>
+          <Text color="cyan">
+            <Spinner type="dots" />
+            {' Loading Canto...'}
+          </Text>
+        </Box>
+      </Box>
+    );
   }
 
   if (error) {
@@ -670,7 +645,7 @@ const Dashboard: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <Box flexDirection="column" flexGrow={1} paddingX={1} paddingY={0}>
+      <Box flexDirection="column" flexGrow={1} padding={1}>
         {/* Modern Header */}
         <ModernHeader
           systemResources={systemResources}
@@ -691,15 +666,13 @@ const Dashboard: React.FC = () => {
           </Box>
         )}
 
-        {/* Modules */}
+        {/* Modules Grid */}
         <Box
           borderStyle="round"
           borderColor={theme.colors.border}
-          paddingX={1}
-          paddingY={0}
+          padding={1}
           marginBottom={1}
           flexDirection="column"
-          flexGrow={1}
         >
           <Box marginBottom={1}>
             <Text bold color={theme.colors.warning}>
@@ -727,64 +700,25 @@ const Dashboard: React.FC = () => {
           )}
         </Box>
 
-        {/* Unified Status Bar */}
-        <Box borderStyle="round" borderColor={theme.colors.border} paddingX={1} marginBottom={1}>
+        {/* Quick Actions Bar */}
+        <Box borderStyle="round" borderColor={theme.colors.border} padding={1} marginBottom={1}>
           {selectedModules.size > 0 ? (
-            <Box justifyContent="space-between" width="100%">
-              <Box>
-                <Text bold color={theme.colors.info}>
-                  {selectedModules.size} selected
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.success} color="black" bold>
-                  {' [S] Start '}
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.error} color="black" bold>
-                  {' [X] Stop '}
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.warning} color="black" bold>
-                  {' [R] Restart '}
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.muted} color="black">
-                  {' [Esc] Clear '}
-                </Text>
-              </Box>
-            </Box>
+            <Text>
+              <Text bold color={theme.colors.info}>
+                {selectedModules.size} selected
+              </Text>
+              <Text dimColor> • </Text>
+              <Text color={theme.colors.success}>[Shift+S]</Text>
+              <Text> Start All • </Text>
+              <Text color={theme.colors.error}>[Shift+X]</Text>
+              <Text> Stop All • </Text>
+              <Text color={theme.colors.warning}>[Shift+R]</Text>
+              <Text> Restart All</Text>
+            </Text>
           ) : (
-            <Box justifyContent="space-between" width="100%">
-              <Box>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.primary}>
-                  {' [↕] '}
-                </Text>
-                <Text color={theme.colors.muted}> Nav </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.success}>
-                  {' [↵] '}
-                </Text>
-                <Text color={theme.colors.muted}> Open </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.warning}>
-                  {' [/] '}
-                </Text>
-                <Text color={theme.colors.muted}> Search </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.info}>
-                  {' [F] '}
-                </Text>
-                <Text color={theme.colors.muted}> Fav </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.primary}>
-                  {' [T] '}
-                </Text>
-                <Text color={theme.colors.muted}> Theme</Text>
-              </Box>
-              <Box>
-                <Text dimColor color={theme.colors.muted}>
-                  {nodeVersion}
-                  {cwdName ? ` │ ${cwdName}` : ''}
-                  {gitBranch ? ` │ ${gitBranch}` : ''}
-                </Text>
-              </Box>
-            </Box>
+            <Text dimColor>
+              ↑↓ navigate • Enter details • Space select • / search • h help • q quit
+            </Text>
           )}
         </Box>
 
@@ -866,39 +800,6 @@ const Dashboard: React.FC = () => {
   );
 };
 
-export async function dashboardCommand(): Promise<void> {
-  // Enter alternate screen buffer (like vim/htop)
-  process.stdout.write('\x1b[?1049h');
-  // Hide cursor
-  process.stdout.write('\x1b[?25l');
-
-  let cleanupCalled = false;
-  const cleanup = () => {
-    if (cleanupCalled) return;
-    cleanupCalled = true;
-    // Show cursor
-    process.stdout.write('\x1b[?25h');
-    // Leave alternate screen buffer
-    process.stdout.write('\x1b[?1049l');
-  };
-
-  // Ensure cleanup on exit signals
-  const exitHandler = () => {
-    cleanup();
-    process.exit(0);
-  };
-
-  process.on('SIGINT', exitHandler);
-  process.on('SIGTERM', exitHandler);
-
-  try {
-    const instance = render(<Dashboard />);
-    await instance.waitUntilExit();
-  } finally {
-    cleanup();
-    // Force exit after 500ms if cleanup is slow
-    setTimeout(() => {
-      process.exit(0);
-    }, 500);
-  }
+export function startDashboard() {
+  render(<Dashboard />);
 }

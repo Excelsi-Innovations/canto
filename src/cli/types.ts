@@ -1,0 +1,25 @@
+/**
+ * Shared types for CLI components
+ */
+
+export interface ModuleStatus {
+  name: string;
+  type: string;
+  status: 'RUNNING' | 'STOPPED' | 'STARTING' | 'STOPPING' | 'ERROR';
+  pid?: number;
+  uptime?: number;
+  cpu?: number;
+  memory?: number;
+  containers?: Array<{
+    name: string;
+    status: string;
+    ports: string[];
+  }>;
+}
+
+export type Screen = 'dashboard' | 'modules' | 'logs' | 'env' | 'help' | 'history' | 'details';
+
+export interface ScreenProps {
+  onBack: () => void;
+  onQuit: () => void;
+}

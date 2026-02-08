@@ -118,6 +118,7 @@ async function parseConfigFile(filePath: string): Promise<unknown> {
  *
  * @param searchDir - Directory to search for config file (defaults to cwd)
  * @param validate - Whether to validate against Zod schema (default: true)
+ * @param silent - Whether to suppress console output (default: false)
  * @returns Parsed and validated configuration object
  * @throws {ConfigNotFoundError} When no config file is found
  * @throws {ConfigValidationError} When config is invalid or fails schema validation
@@ -127,14 +128,17 @@ async function parseConfigFile(filePath: string): Promise<unknown> {
  */
 export async function loadConfig(
   searchDir: string = process.cwd(),
-  validate: boolean = true
+  validate: boolean = true,
+  silent: boolean = false
 ): Promise<Config> {
   const configPath = findConfigFile(searchDir);
   if (!configPath) {
     throw new ConfigNotFoundError(searchDir);
   }
 
-  console.log(`📄 Loading configuration from: ${configPath}`);
+  if (!silent) {
+    console.log(`📄 Loading configuration from: ${configPath}`);
+  }
 
   const rawConfig = await parseConfigFile(configPath);
 
@@ -155,7 +159,9 @@ export async function loadConfig(
     );
   }
 
-  console.log(`✅ Configuration validated successfully`);
+  if (!silent) {
+    console.log(`✅ Configuration validated successfully`);
+  }
   return result.data;
 }
 
@@ -165,6 +171,7 @@ export async function loadConfig(
  *
  * @param searchDir - Directory to search for config file (defaults to cwd)
  * @param validate - Whether to validate against Zod schema (default: true)
+ * @param silent - Whether to suppress console output (default: false)
  * @returns Parsed and validated configuration object
  * @throws {Error} When attempting to load TS/JS config synchronously
  * @throws {ConfigNotFoundError} When no config file is found
@@ -175,7 +182,8 @@ export async function loadConfig(
  */
 export function loadConfigSync(
   searchDir: string = process.cwd(),
-  validate: boolean = true
+  validate: boolean = true,
+  silent: boolean = false
 ): Config {
   const configPath = findConfigFile(searchDir);
   if (!configPath) {
@@ -189,7 +197,9 @@ export function loadConfigSync(
     );
   }
 
-  console.log(`📄 Loading configuration from: ${configPath}`);
+  if (!silent) {
+    console.log(`📄 Loading configuration from: ${configPath}`);
+  }
 
   let rawConfig: unknown;
   if (ext === 'yaml' || ext === 'yml') {
@@ -217,6 +227,8 @@ export function loadConfigSync(
     );
   }
 
-  console.log(`✅ Configuration validated successfully`);
+  if (!silent) {
+    console.log(`✅ Configuration validated successfully`);
+  }
   return result.data;
 }

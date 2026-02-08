@@ -15,6 +15,9 @@ export interface Theme {
     info: string; // Info messages
     border: string; // Border color
     headerBorder: string; // Header border
+    background: string; // Background color (for shadows/depth)
+    muted: string; // Muted/secondary text
+    highlight: string; // Highlight color for selected items
   };
 }
 
@@ -39,67 +42,112 @@ export interface CommandHistory {
 }
 
 /**
- * Built-in themes
+ * Built-in themes with professional hex colors
  */
 export const THEMES: Record<string, Theme> = {
   default: {
-    name: 'Default (Cyan)',
+    name: 'Pessoa',
     colors: {
-      primary: 'cyan',
-      success: 'green',
-      error: 'red',
-      warning: 'yellow',
-      info: 'blue',
-      border: 'gray',
-      headerBorder: 'cyan',
+      primary: '#C4A882', // Warm parchment/sand
+      success: '#7D9E80', // Muted sage green
+      error: '#B85C5C', // Soft burgundy
+      warning: '#D4A957', // Warm gold
+      info: '#8FAABD', // Desaturated steel blue
+      border: '#3A3632', // Warm dark brown
+      headerBorder: '#A68B6B', // Warm bronze
+      background: '#1C1A17', // Deep warm black
+      muted: '#6B6560', // Warm gray
+      highlight: '#3D352E', // Selection warm
+    },
+  },
+  phosphor: {
+    name: 'Phosphor Amber',
+    colors: {
+      primary: '#FFB000', // Classic amber
+      success: '#CCAA00', // Amber-gold
+      error: '#FF6633', // Orange-red
+      warning: '#FFD700', // Bright gold
+      info: '#CC8800', // Dark amber
+      border: '#3D2B00', // Dark amber border
+      headerBorder: '#FFB000', // Amber
+      background: '#0D0A00', // Near black
+      muted: '#7A6020', // Muted amber
+      highlight: '#4D3500', // Amber selection
     },
   },
   ocean: {
-    name: 'Ocean (Blue)',
+    name: 'Ocean Deep',
     colors: {
-      primary: 'blue',
-      success: 'cyan',
-      error: 'red',
-      warning: 'yellow',
-      info: 'magenta',
-      border: 'blue',
-      headerBorder: 'blue',
+      primary: '#7EB8C9', // Desaturated cyan
+      success: '#6EBAA8', // Muted aqua
+      error: '#C97171', // Soft coral
+      warning: '#C9AD5D', // Muted gold
+      info: '#8B8FC9', // Soft indigo
+      border: '#1E3A5A', // Deep blue
+      headerBorder: '#5A9AB5', // Steel blue
+      background: '#0F172A', // Slate dark
+      muted: '#5A6A7A', // Slate gray
+      highlight: '#1E3A5A', // Blue selection
     },
   },
   sunset: {
-    name: 'Sunset (Magenta)',
+    name: 'Sunset Glow',
     colors: {
-      primary: 'magenta',
-      success: 'green',
-      error: 'red',
-      warning: 'yellow',
-      info: 'cyan',
-      border: 'magenta',
-      headerBorder: 'magenta',
+      primary: '#D48BA5', // Muted rose
+      success: '#5CB88A', // Soft emerald
+      error: '#C95555', // Muted red
+      warning: '#C9A040', // Warm amber
+      info: '#9A7FC9', // Soft purple
+      border: '#5A2A3A', // Dark rose
+      headerBorder: '#B56A8A', // Muted pink
+      background: '#1F1B24', // Purple-black
+      muted: '#7A7580', // Warm gray
+      highlight: '#6A2A4A', // Rose selection
     },
   },
   forest: {
-    name: 'Forest (Green)',
+    name: 'Forest Night',
     colors: {
-      primary: 'green',
-      success: 'cyan',
-      error: 'red',
-      warning: 'yellow',
-      info: 'blue',
-      border: 'green',
-      headerBorder: 'green',
+      primary: '#5AAA7A', // Soft emerald
+      success: '#7AC9A0', // Light sage
+      error: '#C97171', // Muted red
+      warning: '#C9AD5D', // Soft gold
+      info: '#6A9AC9', // Muted blue
+      border: '#1A3A2A', // Dark green
+      headerBorder: '#4A8A6A', // Forest green
+      background: '#14191F', // Dark forest
+      muted: '#5A6A5A', // Green gray
+      highlight: '#1A4A3A', // Deep green
     },
   },
-  monochrome: {
-    name: 'Monochrome (Gray)',
+  tokyo: {
+    name: 'Tokyo Night',
     colors: {
-      primary: 'white',
-      success: 'white',
-      error: 'white',
-      warning: 'white',
-      info: 'white',
-      border: 'gray',
-      headerBorder: 'white',
+      primary: '#7AA2F7', // Blue
+      success: '#9ECE6A', // Green
+      error: '#F7768E', // Red
+      warning: '#E0AF68', // Orange
+      info: '#7DCFFF', // Cyan
+      border: '#1A1B26', // Background dark
+      headerBorder: '#BB9AF7', // Purple
+      background: '#16161E', // Darker background
+      muted: '#565F89', // Gray blue
+      highlight: '#283457', // Selection
+    },
+  },
+  dracula: {
+    name: 'Dracula',
+    colors: {
+      primary: '#BD93F9', // Purple
+      success: '#50FA7B', // Green
+      error: '#FF5555', // Red
+      warning: '#F1FA8C', // Yellow
+      info: '#8BE9FD', // Cyan
+      border: '#44475A', // Gray
+      headerBorder: '#FF79C6', // Pink
+      background: '#282A36', // Background
+      muted: '#6272A4', // Comment
+      highlight: '#44475A', // Selection
     },
   },
 };
@@ -116,13 +164,13 @@ export function loadPreferences(): UserPreferences {
     if (existsSync(PREFS_FILE)) {
       const data = readFileSync(PREFS_FILE, 'utf-8');
       const prefs = JSON.parse(data);
-      
+
       // Convert history timestamps back to Date objects
       prefs.history = prefs.history.map((h: any) => ({
         ...h,
         timestamp: new Date(h.timestamp),
       }));
-      
+
       return prefs;
     }
   } catch (error) {
@@ -199,7 +247,7 @@ export function isFavorite(moduleName: string): boolean {
  */
 export function addToHistory(command: string, module?: string, success: boolean = true): void {
   const prefs = loadPreferences();
-  
+
   prefs.history.unshift({
     command,
     module,
@@ -209,7 +257,7 @@ export function addToHistory(command: string, module?: string, success: boolean 
 
   // Keep only last 100 commands
   prefs.history = prefs.history.slice(0, 100);
-  
+
   savePreferences(prefs);
 }
 
