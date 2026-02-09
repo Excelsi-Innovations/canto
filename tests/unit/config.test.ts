@@ -1,14 +1,16 @@
 import { describe, test, expect } from 'bun:test';
 import { resolve } from 'path';
-import { validateConfig, safeValidateConfig } from '../src/config/schema';
+import { validateConfig, safeValidateConfig } from '../../src/config/schema';
 import {
   loadConfig,
   loadConfigSync,
   findConfigFile,
   ConfigNotFoundError,
-} from '../src/config/parser';
+} from '../../src/config/parser';
 
-const FIXTURES_DIR = resolve(__dirname, 'fixtures');
+const FIXTURES_DIR = resolve(__dirname, '../fixtures');
+const JSON_ONLY_DIR = resolve(__dirname, '../fixtures/json-only');
+const INVALID_CONFIG_DIR = resolve(__dirname, '../fixtures/invalid-config');
 
 describe('Config Schema Validation', () => {
   test('should validate a valid config object', () => {
@@ -112,7 +114,7 @@ describe('Config File Discovery', () => {
   test('should find YAML config file', () => {
     const found = findConfigFile(FIXTURES_DIR);
     expect(found).toBeTruthy();
-    expect(found).toContain('valid.config.yaml');
+    expect(found).toContain('dev.config.yaml');
   });
 
   test('should return null when no config file exists', () => {
@@ -130,9 +132,10 @@ describe('Config Loading - Sync', () => {
   });
 
   test('should load JSON config when no YAML exists', () => {
-    // TODO: Create temporary directory with only JSON config
-    const config = loadConfigSync(FIXTURES_DIR);
+    const config = loadConfigSync(JSON_ONLY_DIR);
     expect(config.modules.length).toBeGreaterThan(0);
+    expect(config.modules[0]?.name).toBe('json-backend');
+    expect(config.modules[1]?.name).toBe('json-frontend');
   });
 
   test('should throw ConfigNotFoundError when no config exists', () => {
@@ -140,11 +143,7 @@ describe('Config Loading - Sync', () => {
   });
 
   test('should throw validation error for invalid config', () => {
-    // TODO: Need to test with isolated invalid config directory
-    // For now, just verify that valid config loads successfully
-    expect(() => {
-      loadConfigSync(FIXTURES_DIR);
-    }).not.toThrow();
+    expect(() => loadConfigSync(INVALID_CONFIG_DIR)).toThrow();
   });
 });
 

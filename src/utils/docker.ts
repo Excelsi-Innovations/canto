@@ -1,5 +1,4 @@
 import { execSync } from 'child_process';
-import { readFileSync, existsSync } from 'fs';
 import { dirname } from 'path';
 import pc from 'picocolors';
 import { dockerCache } from './docker-cache.js';
@@ -90,10 +89,11 @@ export function listContainers(composeFilePath: string): DockerContainer[] {
     const cwd = dirname(composeFilePath);
 
     // Get project name from docker-compose.yml
-    const projectName = execSync(
-      `docker compose -f ${composeFilePath} config --format json`,
-      { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
-    );
+    const projectName = execSync(`docker compose -f ${composeFilePath} config --format json`, {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    });
 
     let project = 'default';
     try {
@@ -138,38 +138,6 @@ export function listContainers(composeFilePath: string): DockerContainer[] {
       console.error(pc.dim(`Docker error: ${error.message}`));
     }
     dockerCache.set(composeFilePath, []);
-    return [];
-  }
-}
-
-    // List containers using docker ps with project label filter
-    const output = execSync(
-      `docker ps -a --filter "label=com.docker.compose.project=${project}" --format "{{.ID}}|{{.Names}}|{{.Status}}|{{.Image}}|{{.Ports}}|{{.CreatedAt}}"`,
-      { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
-    );
-
-    if (!output.trim()) {
-      return [];
-    }
-
-    const lines = output.trim().split('\n');
-    return lines.map((line) => {
-      const parts = line.split('|');
-      const [id, name, status, image, ports, created] = parts.map((p) => p?.trim() ?? '');
-      return {
-        id: id || '',
-        name: name || '',
-        status: parseContainerStatus(status || ''),
-        image: image || '',
-        ports: ports ? ports.split(',').map((p) => p.trim()) : [],
-        created: created || '',
-      };
-    });
-  } catch (error) {
-    // Silently fail if docker is not available or compose file not found
-    if (error instanceof Error) {
-      console.error(pc.dim(`Docker error: ${error.message}`));
-    }
     return [];
   }
 }

@@ -1,0 +1,21 @@
+{
+  "modules": [
+    {
+      "name": "json-backend",
+      "type": "workspace",
+      "path": "./apps/backend",
+      "run": {
+        "dev": "npm run dev",
+        "build": "npm run build"
+      }
+    },
+    {
+      "name": "json-frontend",
+      "type": "workspace",
+      "path": "./apps/frontend",
+      "run": {
+        "dev": "npm run dev"
+      }
+    }
+  ]
+}

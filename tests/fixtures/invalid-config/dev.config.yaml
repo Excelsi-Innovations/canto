@@ -1,0 +1,5 @@
+modules:
+  - name: invalid-module
+    type: workspace
+    # Missing required 'path' field
+    # Missing required 'run' field
