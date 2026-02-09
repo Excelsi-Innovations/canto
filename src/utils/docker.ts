@@ -98,10 +98,10 @@ export function listContainers(composeFilePath: string): DockerContainer[] {
     let project = 'default';
     try {
       const config = JSON.parse(projectName);
-      project = config.name || dirname(composeFilePath).split(/[\\/]/).pop() || 'default';
+      project = config.name ?? dirname(composeFilePath).split(/[\\/]/).pop() ?? 'default';
     } catch {
       // Fallback to directory name
-      project = dirname(composeFilePath).split(/[\\/]/).pop() || 'default';
+      project = dirname(composeFilePath).split(/[\\/]/).pop() ?? 'default';
     }
 
     // List containers using docker ps with project label filter
@@ -120,12 +120,12 @@ export function listContainers(composeFilePath: string): DockerContainer[] {
       const parts = line.split('|');
       const [id, name, status, image, ports, created] = parts.map((p) => p?.trim() ?? '');
       return {
-        id: id || '',
-        name: name || '',
-        status: parseContainerStatus(status || ''),
-        image: image || '',
+        id: id ?? '',
+        name: name ?? '',
+        status: parseContainerStatus(status ?? ''),
+        image: image ?? '',
         ports: ports ? ports.split(',').map((p) => p.trim()) : [],
-        created: created || '',
+        created: created ?? '',
       };
     });
 
@@ -158,7 +158,7 @@ export function getServicesContainers(
   if (!services || services.length === 0) {
     // Return all containers as services
     return containers.map((container) => ({
-      name: container.name.split('-').pop() || container.name, // Try to extract service name
+      name: container.name.split('-').pop() ?? container.name, // Try to extract service name
       container,
     }));
   }

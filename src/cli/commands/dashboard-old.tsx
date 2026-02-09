@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
 import Spinner from 'ink-spinner';
-import Fuse from 'fuse.js';
+import Fuse, { type FuseResult } from 'fuse.js';
 import { ProcessManager } from '../../processes/manager.js';
 import { ModuleOrchestrator } from '../../modules/index.js';
 import { DockerExecutor } from '../../modules/docker.js';
@@ -75,7 +75,7 @@ const Dashboard: React.FC = () => {
   // Get current theme - recalcula quando forceUpdate muda
   const theme: Theme = useMemo(() => {
     const themeName = prefsManager.getTheme();
-    return THEMES[themeName] || THEMES['default']!;
+    return THEMES[themeName] ?? THEMES['default'] ?? ({} as Theme);
   }, [forceUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounce search query to reduce re-renders
@@ -196,7 +196,7 @@ const Dashboard: React.FC = () => {
       const state = autoRestartManager.getState(module.name);
 
       // If module is in ERROR state and not already restarting
-      if (module.status === 'ERROR' && (!state || !state.isRestarting)) {
+      if (module.status === 'ERROR' && (!state?.isRestarting)) {
         const restartKey = `${module.name}-restart`;
 
         // Only register failure once per error occurrence
@@ -232,7 +232,7 @@ const Dashboard: React.FC = () => {
         shownAutoRestartAlerts.current.delete(`${module.name}-restart`);
       }
     });
-  }, [modules, autoRestartManager, orchestrator, prefsManager, showToast, triggerUpdate]);
+  }, [modules, autoRestartManager, orchestrator, prefsManager, showToast, triggerUpdate, dataManager]);
 
   // Cleanup auto-restart on unmount
   useEffect(() => {
@@ -252,7 +252,7 @@ const Dashboard: React.FC = () => {
     });
 
     const results = fuse.search(debouncedSearchQuery);
-    return results.map((result) => result.item);
+    return results.map((result: FuseResult<ModuleStatus>) => result.item);
   }, [modules, debouncedSearchQuery]);
 
   // Smart sorting: favorites first, then RUNNING status, then alphabetically
@@ -271,8 +271,8 @@ const Dashboard: React.FC = () => {
         STOPPING: 2,
         STOPPED: 1,
       };
-      const aPriority = statusPriority[a.status] || 0;
-      const bPriority = statusPriority[b.status] || 0;
+      const aPriority = statusPriority[a.status] ?? 0;
+      const bPriority = statusPriority[b.status] ?? 0;
       if (aPriority !== bPriority) return bPriority - aPriority;
 
       // 3. Sort alphabetically by name
@@ -475,11 +475,11 @@ const Dashboard: React.FC = () => {
               | 'start'
               | 'stop'
               | 'restart';
-            executeBulkAction(bulkAction, confirmAction.moduleNames || []);
+            executeBulkAction(bulkAction, confirmAction.moduleNames ?? []);
           } else {
             executeModuleAction(
               confirmAction.action as 'start' | 'stop' | 'restart',
-              confirmAction.moduleName || ''
+              confirmAction.moduleName ?? ''
             );
           }
           setConfirmAction(null);
@@ -495,7 +495,7 @@ const Dashboard: React.FC = () => {
           // In search mode - handle text input
           if (key.backspace || key.delete) {
             setSearchQuery(searchQuery.slice(0, -1));
-          } else if (input && input.length === 1 && /[a-zA-Z0-9-_]/.test(input)) {
+          } else if (input?.length === 1 && /[a-zA-Z0-9-_]/.test(input)) {
             setSearchQuery(searchQuery + input);
           }
         } else {
@@ -574,9 +574,10 @@ const Dashboard: React.FC = () => {
             const themeNames = Object.keys(THEMES);
             const currentIndex = themeNames.indexOf(prefsManager.getTheme());
             const nextIndex = (currentIndex + 1) % themeNames.length;
-            const nextTheme = themeNames[nextIndex];
-            prefsManager.setTheme(nextTheme!);
-            showToast(`Theme changed to ${THEMES[nextTheme!]!.name}`, 'info');
+            const nextThemeName = themeNames[nextIndex] ?? 'default';
+            prefsManager.setTheme(nextThemeName);
+            const nextTheme = THEMES[nextThemeName] ?? THEMES['default'] ?? ({} as Theme);
+            showToast(`Theme changed to ${nextTheme.name}`, 'info');
             // Force re-render
             triggerUpdate();
           } else if (key.return) {
@@ -692,7 +693,7 @@ const Dashboard: React.FC = () => {
     return (
       <ModuleDetailsScreen
         module={module}
-        moduleConfig={moduleConfig || null}
+        moduleConfig={moduleConfig ?? null}
         onBack={() => setScreen('dashboard')}
         onQuit={handleExit}
       />
@@ -864,8 +865,8 @@ const Dashboard: React.FC = () => {
                       {confirmAction.action.replace('bulk-', '')}
                     </Text>{' '}
                     <Text bold color="cyan">
-                      {confirmAction.moduleNames?.length || 0} module
-                      {(confirmAction.moduleNames?.length || 0) > 1 ? 's' : ''}
+                      {confirmAction.moduleNames?.length ?? 0} module
+                      {(confirmAction.moduleNames?.length ?? 0) > 1 ? 's' : ''}
                     </Text>
                     ?
                   </Text>

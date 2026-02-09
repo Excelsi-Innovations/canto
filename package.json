@@ -32,7 +32,7 @@
     "validate": "npm run type-check && npm run lint && npm run format:check",
     "prepublishOnly": "npm run validate && npm run build",
     "bun:dev": "bun --watch src/cli/index.ts",
-    "bun:build": "bun build src/index.ts --outdir dist --target node --sourcemap=external --minify",
+    "bun:build": "bun build src/cli/index.ts --outdir dist/cli --target node --sourcemap=external --minify",
     "bun:install": "bun install",
     "bun:test": "bun test",
     "bun:validate": "bun run type-check && bun run lint && bun run format:check"
@@ -83,7 +83,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@types/bun": "latest",
-    "@types/node": "^25.2.1",
+    "@types/node": "^25.2.2",
     "@types/react": "^19.2.13",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
@@ -92,6 +92,7 @@
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^7.0.1",
     "prettier": "^3.2.4",
+    "react-devtools-core": "^7.0.1",
     "tsx": "^4.21.0",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.54.0"

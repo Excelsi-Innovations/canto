@@ -115,7 +115,8 @@ function detectDocker(dir: string, maxDepth = 3): DetectedDocker {
         const fullPath = join(currentDir, file);
         if (existsSync(fullPath)) {
           // Store relative path from root
-          const relativePath = currentDir === dir ? file : join(currentDir.replace(dir, '').slice(1), file);
+          const relativePath =
+            currentDir === dir ? file : join(currentDir.replace(dir, '').slice(1), file);
           if (!composeFiles.includes(relativePath)) {
             composeFiles.push(relativePath);
           }
@@ -130,7 +131,7 @@ function detectDocker(dir: string, maxDepth = 3): DetectedDocker {
       // Search subdirectories (common infra directories)
       if (depth < maxDepth) {
         const commonInfraDirs = ['infra', 'infrastructure', 'docker', 'deployments', '.docker'];
-        
+
         for (const subdir of commonInfraDirs) {
           const subdirPath = join(currentDir, subdir);
           if (existsSync(subdirPath)) {

@@ -69,8 +69,8 @@ export function parseEnvFile(filePath: string): EnvVar[] {
       // Parse variable (KEY=VALUE or KEY="VALUE" or KEY='VALUE')
       const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
       if (match) {
-        const key = match[1] || '';
-        const rawValue = match[2] || '';
+        const key = match[1] ?? '';
+        const rawValue = match[2] ?? '';
         let value = rawValue.trim();
 
         // Remove quotes if present
@@ -144,7 +144,7 @@ export function detectEnvFiles(rootDir: string, maxDepth = 3): EnvFile[] {
           });
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Silently skip directories we can't read
     }
   }
@@ -271,7 +271,7 @@ export function groupEnvFilesByDirectory(envFiles: EnvFile[]): Map<string, EnvFi
 
   for (const file of envFiles) {
     const dir = dirname(file.relativePath);
-    const existing = groups.get(dir) || [];
+    const existing = groups.get(dir) ?? [];
     existing.push(file);
     groups.set(dir, existing);
   }
@@ -295,12 +295,12 @@ export function extractModuleFromPath(envPath: string): string | null {
   );
 
   if (moduleIndex !== -1 && moduleIndex < parts.length - 1) {
-    return parts[moduleIndex + 1] || null;
+    return parts[moduleIndex + 1] ?? null;
   }
 
   // Fallback: use parent directory name
   if (parts.length > 1) {
-    return parts[parts.length - 2] || null;
+    return parts[parts.length - 2] ?? null;
   }
 
   return null;

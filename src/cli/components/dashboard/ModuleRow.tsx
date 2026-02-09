@@ -65,7 +65,7 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
       ERROR: { icon: '✗', color: 'red' as const },
     };
 
-    const status = statusConfig[module.status as keyof typeof statusConfig] || {
+    const status = statusConfig[module.status as keyof typeof statusConfig] ?? {
       icon: '?',
       color: 'gray' as const,
     };
@@ -77,11 +77,11 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
     const alerts = checkResourceAlerts(module);
     const criticalAlert = alerts.find((a) => a.level === 'critical');
     const warningAlert = alerts.find((a) => a.level === 'warning');
-    const alert = criticalAlert || warningAlert;
+    const alert = criticalAlert ?? warningAlert;
 
     // Format auto-restart info
     const autoRestartInfo = useMemo(() => {
-      if (!autoRestartState || !autoRestartState.nextRetryAt) return null;
+      if (!autoRestartState?.nextRetryAt) return null;
 
       const now = Date.now();
       const nextRetry = autoRestartState.nextRetryAt.getTime();
@@ -181,8 +181,8 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
     if (!areEqual) return false;
 
     // Compare containers
-    const prevContainers = prevProps.module.containers || [];
-    const nextContainers = nextProps.module.containers || [];
+    const prevContainers = prevProps.module.containers ?? [];
+    const nextContainers = nextProps.module.containers ?? [];
     if (prevContainers.length !== nextContainers.length) return false;
 
     // Compare autoRestartState

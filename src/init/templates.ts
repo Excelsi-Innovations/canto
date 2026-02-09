@@ -154,17 +154,19 @@ export function configToYaml(config: Config): string {
 
   for (const module of config.modules) {
     // Escape names with special characters (like @scoped packages)
-    const safeName = module.name.includes('@') || module.name.includes(':') || module.name.includes('#')
-      ? `"${module.name}"`
-      : module.name;
+    const safeName =
+      module.name.includes('@') || module.name.includes(':') || module.name.includes('#')
+        ? `"${module.name}"`
+        : module.name;
     lines.push(`  - name: ${safeName}`);
     lines.push(`    type: ${module.type}`);
 
     switch (module.type) {
-      case 'workspace':
+      case 'workspace': {
         lines.push(`    path: ${module.path}`);
         // Only add run: if there are commands
-        const hasCommands = module.run.dev || module.run.build || module.run.test || module.run.start;
+        const hasCommands =
+          module.run.dev ?? module.run.build ?? module.run.test ?? module.run.start;
         if (hasCommands) {
           lines.push('    run:');
           if (module.run.dev) {
@@ -184,6 +186,7 @@ export function configToYaml(config: Config): string {
           lines.push(`    packageManager: ${module.packageManager}`);
         }
         break;
+      }
 
       case 'docker':
         lines.push(`    composeFile: ${module.composeFile}`);
@@ -212,9 +215,8 @@ export function configToYaml(config: Config): string {
     if (module.dependsOn && module.dependsOn.length > 0) {
       lines.push('    dependsOn:');
       for (const dep of module.dependsOn) {
-        const safeDep = dep.includes('@') || dep.includes(':') || dep.includes('#')
-          ? `"${dep}"`
-          : dep;
+        const safeDep =
+          dep.includes('@') || dep.includes(':') || dep.includes('#') ? `"${dep}"` : dep;
         lines.push(`      - ${safeDep}`);
       }
     }

@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import { createBar, formatCPU, type SystemResources } from '../../../utils/resources.js';
-import { ResourceHistory } from '../../lib/resource-history.js';
+import type { ResourceHistory } from '../../lib/resource-history.js';
 import type { Theme } from '../../../utils/preferences.js';
 import { VERSION } from '../../../version.js';
 
@@ -69,12 +69,16 @@ export const ModernHeader: React.FC<ModernHeaderProps> = ({
         )}
       </Box>
 
-      {/* Gradient separator — full width via flexGrow */}
-      <Box marginBottom={1}>
-        <Text color={theme.colors.headerBorder}>
-          ░▒▓██████████████████████████████████████████████████████████████████████████████████████▓▒░
-        </Text>
-      </Box>
+      {/* Gradient separator - using border instead of hardcoded text for responsiveness */}
+      <Box 
+        marginBottom={1} 
+        borderStyle="single" 
+        borderTop={false} 
+        borderLeft={false} 
+        borderRight={false} 
+        borderColor={theme.colors.headerBorder} 
+        width="100%"
+      />
 
       {/* System Stats Row 1: CPU */}
       <Box marginBottom={0}>

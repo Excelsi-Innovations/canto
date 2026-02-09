@@ -28,146 +28,145 @@ export const Sidebar: React.FC<SidebarProps> = ({ stats, selectedScreen, theme }
   return (
     <Box
       flexDirection="column"
-      width={28}
+      width={32}
       borderStyle="round"
       borderColor={theme.colors.border}
-      padding={1}
+      paddingX={1}
+      paddingY={0}
       marginRight={1}
       height="100%"
     >
-      {/* Compact Canto Logo */}
-      <Box marginBottom={0} flexDirection="column">
+      {/* Compact Canto Logo - Centered */}
+      <Box 
+        marginTop={0} 
+        marginBottom={1} 
+        flexDirection="column" 
+        width="100%"
+      >
         {SIDEBAR_LOGO.map((line, i) => (
           <Text key={i} bold color={theme.colors.headerBorder}>
-            {line}
+            {line} 
           </Text>
         ))}
-      </Box>
-      <Box marginBottom={1}>
-        <Text dimColor color={theme.colors.muted}>
-          The Dev Maestro
-        </Text>
+        <Box marginTop={1} alignItems="center" justifyContent="center">
+           <Text dimColor color={theme.colors.muted}>
+            The Dev Maestro
+          </Text>
+        </Box>
       </Box>
 
       {/* Stats Section with Pills */}
       <Box
         flexDirection="column"
-        borderStyle="round"
+        borderStyle="single"
         borderColor={theme.colors.border}
-        padding={1}
+        paddingX={1}
+        paddingY={0}
         marginBottom={1}
       >
-        <Box marginBottom={0}>
-          <Text backgroundColor={theme.colors.success} color="black" bold>
-            {' '}
-            ● {stats.runningCount} Running{' '}
-          </Text>
+        <Box justifyContent="space-between" marginBottom={0}>
+             <Text>Running</Text>
+             <Text color={theme.colors.success} bold>{stats.runningCount}</Text>
         </Box>
-        <Box marginBottom={0} marginTop={0}>
-          <Text backgroundColor={theme.colors.muted} color="black" bold>
-            {' '}
-            ○ {stats.stoppedCount} Stopped{' '}
-          </Text>
+        <Box justifyContent="space-between" marginBottom={0}>
+             <Text>Stopped</Text>
+             <Text color={theme.colors.muted} bold>{stats.stoppedCount}</Text>
         </Box>
-        <Box marginTop={1}>
-          <Text dimColor color={theme.colors.headerBorder}>
-            ░▒▓█████████████▓▒░
-          </Text>
-        </Box>
-        <Box>
-          <Text color={theme.colors.info}>Total: {stats.total} modules</Text>
+        <Box marginTop={0} borderStyle="single" borderTop={false} borderLeft={false} borderRight={false} borderColor={theme.colors.border} />
+         <Box justifyContent="space-between" marginTop={0}>
+             <Text>Total</Text>
+             <Text color={theme.colors.info} bold>{stats.total}</Text>
         </Box>
       </Box>
 
       {/* Navigation Menu */}
-      <Box flexDirection="column" marginBottom={1}>
+      <Box flexDirection="column" marginBottom={1} flexGrow={1}>
         <Box marginBottom={1}>
-          <Text dimColor color={theme.colors.muted}>
+          <Text dimColor color={theme.colors.muted} underline>
             NAVIGATION
           </Text>
         </Box>
 
-        <Box marginBottom={0}>
-          <Text
-            bold={selectedScreen === 'dashboard'}
-            color={selectedScreen === 'dashboard' ? theme.colors.primary : theme.colors.muted}
-          >
-            {selectedScreen === 'dashboard' ? '▸ ' : '  '}🏠 Dashboard
-          </Text>
-        </Box>
-
-        <Box marginBottom={0}>
-          <Text
-            bold={selectedScreen === 'logs'}
-            color={selectedScreen === 'logs' ? theme.colors.primary : theme.colors.muted}
-          >
-            {selectedScreen === 'logs' ? '▸ ' : '  '}📄 Logs
-          </Text>
-        </Box>
-
-        <Box marginBottom={0}>
-          <Text
-            bold={selectedScreen === 'history'}
-            color={selectedScreen === 'history' ? theme.colors.primary : theme.colors.muted}
-          >
-            {selectedScreen === 'history' ? '▸ ' : '  '}🕐 History
-          </Text>
-        </Box>
-
-        <Box marginBottom={0}>
-          <Text
-            bold={selectedScreen === 'env'}
-            color={selectedScreen === 'env' ? theme.colors.primary : theme.colors.muted}
-          >
-            {selectedScreen === 'env' ? '▸ ' : '  '}⚙️ Environment
-          </Text>
-        </Box>
-
-        <Box>
-          <Text
-            bold={selectedScreen === 'help'}
-            color={selectedScreen === 'help' ? theme.colors.primary : theme.colors.muted}
-          >
-            {selectedScreen === 'help' ? '▸ ' : '  '}❓ Help
-          </Text>
-        </Box>
+        <NavItem 
+            label="Dashboard" 
+            icon="🏠" 
+            hotkey="B" 
+            isActive={selectedScreen === 'dashboard'} 
+            theme={theme} 
+        />
+        <NavItem 
+            label="Logs" 
+            icon="📄" 
+            hotkey="L" 
+            isActive={selectedScreen === 'logs'} 
+            theme={theme} 
+        />
+        <NavItem 
+            label="History" 
+            icon="🕐" 
+            hotkey="I" 
+            isActive={selectedScreen === 'history'} 
+            theme={theme} 
+        />
+        <NavItem 
+            label="Environment" 
+            icon="⚙️" 
+            hotkey="E" 
+            isActive={selectedScreen === 'env'} 
+            theme={theme} 
+        />
+        <NavItem 
+            label="Modules" 
+            icon="📦" 
+            hotkey="M" 
+            isActive={selectedScreen === 'modules' || selectedScreen === 'details'} 
+            theme={theme} 
+        />
+        <NavItem 
+            label="Help" 
+            icon="❓" 
+            hotkey="H" 
+            isActive={selectedScreen === 'help'} 
+            theme={theme} 
+        />
       </Box>
 
-      {/* Footer - Hotkeys with visual buttons */}
-      <Box marginTop={1} flexDirection="column">
-        <Text dimColor color={theme.colors.headerBorder}>
-          ░▒▓█████████████▓▒░
+      {/* Footer - Hotkeys */}
+      <Box marginTop={0} flexDirection="column" borderStyle="single" borderColor={theme.colors.border} padding={1}>
+        <Text dimColor color={theme.colors.muted} underline>
+          QUICK KEYS
         </Text>
-        <Box marginTop={1}>
-          <Text dimColor color={theme.colors.muted}>
-            HOTKEYS
-          </Text>
-        </Box>
-        <Box marginTop={0}>
-          <Text backgroundColor={theme.colors.border} color={theme.colors.primary}>
-            {' [H] '}
-          </Text>
-          <Text color={theme.colors.muted}> Help</Text>
-        </Box>
-        <Box marginTop={0}>
-          <Text backgroundColor={theme.colors.border} color={theme.colors.error}>
-            {' [Q] '}
-          </Text>
-          <Text color={theme.colors.muted}> Quit</Text>
+        <Box marginTop={0} flexDirection="column">
+            <Text color={theme.colors.muted}><Text color={theme.colors.primary} bold>/</Text> Search</Text>
+            <Text color={theme.colors.muted}><Text color={theme.colors.primary} bold>Space</Text> Select</Text>
+            <Text color={theme.colors.muted}><Text color={theme.colors.primary} bold>Enter</Text> Details</Text>
+             <Text color={theme.colors.muted}><Text color={theme.colors.error} bold>Q</Text> Quit</Text>
         </Box>
       </Box>
 
       {/* Rotating Pessoa Quote */}
-      <Box marginTop={1} flexDirection="column">
-        <Text dimColor color={theme.colors.headerBorder}>
-          ░▒▓█████████████▓▒░
-        </Text>
-        <Box marginTop={1}>
+      <Box marginTop={1} marginBottom={0} flexDirection="column" alignItems="center">
           <Text italic dimColor color={theme.colors.primary} wrap="wrap">
             {quote}
           </Text>
-        </Box>
       </Box>
     </Box>
   );
 };
+
+const NavItem: React.FC<{
+    label: string;
+    icon: string;
+    hotkey: string;
+    isActive: boolean;
+    theme: Theme;
+}> = ({ label, icon, hotkey, isActive, theme }) => (
+    <Box marginBottom={0}>
+        <Text color={isActive ? theme.colors.primary : theme.colors.muted}>
+            {isActive ? '▸ ' : '  '}
+            <Text bold={isActive}>{icon} {label}</Text>
+        </Text>
+        <Box flexGrow={1} />
+        <Text color={theme.colors.muted} dimColor>[{hotkey}]</Text>
+    </Box>
+);

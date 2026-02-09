@@ -11,19 +11,20 @@ import { checkCommand } from './commands/check.js';
 import { initCommand } from './commands/init.js';
 import { dashboardCommand } from './commands/dashboard.js';
 import { envCommand } from './commands/env.js';
+import { updateCommand } from './commands/update.js';
 import { errorBox } from './utils/format.js';
 
 // Global error handlers - NEVER let Canto crash!
 process.on('uncaughtException', (error: Error) => {
-  console.error('\n' + errorBox('Uncaught Exception', error.message));
+  console.error(`\n${  errorBox('Uncaught Exception', error.message)}`);
   console.error(pc.dim('\nStack trace:'));
-  console.error(pc.dim(error.stack || 'No stack trace available'));
+  console.error(pc.dim(error.stack ?? 'No stack trace available'));
   console.error(pc.yellow('\n⚠️  Canto is still running. Use Ctrl+C to exit.\n'));
 });
 
 process.on('unhandledRejection', (reason: unknown) => {
   const message = reason instanceof Error ? reason.message : String(reason);
-  console.error('\n' + errorBox('Unhandled Promise Rejection', message));
+  console.error(`\n${  errorBox('Unhandled Promise Rejection', message)}`);
   if (reason instanceof Error && reason.stack) {
     console.error(pc.dim('\nStack trace:'));
     console.error(pc.dim(reason.stack));
@@ -32,13 +33,17 @@ process.on('unhandledRejection', (reason: unknown) => {
 });
 
 // Graceful shutdown on SIGINT/SIGTERM
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log(pc.cyan('\n\n👋 Canto shutting down gracefully...\n'));
+  const { shutdownPreferencesManager } = await import('../utils/preferences-manager.js');
+  await shutdownPreferencesManager();
   process.exit(0);
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log(pc.cyan('\n\n👋 Canto shutting down gracefully...\n'));
+  const { shutdownPreferencesManager } = await import('../utils/preferences-manager.js');
+  await shutdownPreferencesManager();
   process.exit(0);
 });
 
@@ -99,6 +104,8 @@ program
   .alias('dash')
   .description('Launch interactive dashboard (OS-style interface)')
   .action(dashboardCommand);
+
+program.command('update').description('Update Canto to the latest version').action(updateCommand);
 
 // Default action - show interactive dashboard
 program.action(async () => {

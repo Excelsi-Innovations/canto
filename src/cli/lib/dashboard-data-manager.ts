@@ -31,7 +31,7 @@ export class DashboardDataManager {
   private cache: StatusCache;
   private subscribers: Set<ModuleStatusSubscriber> = new Set();
 
-  private updateTimer: NodeJS.Timer | null = null;
+  private updateTimer: NodeJS.Timeout | null = null;
   private dirtyModules: Set<string> = new Set();
   private isInitialized: boolean = false;
   private configChangeDebounceTimer: NodeJS.Timeout | null = null;
@@ -203,7 +203,7 @@ export class DashboardDataManager {
       this.configWatcher.on('error', () => {
         // Silently ignore watcher errors
       });
-    } catch (error) {
+    } catch (_error) {
       // Silently fail if watching not supported
     }
   }
@@ -313,9 +313,9 @@ export class DashboardDataManager {
         try {
           const services = this.dockerExecutor.getServices(module);
           moduleStatus.containers = services
-            .filter((s) => s.container)
+            .filter((s): s is typeof s & { container: NonNullable<typeof s.container> } => !!s.container)
             .map((s) => {
-              const container = s.container!;
+              const {container} = s;
               return {
                 name: container.name,
                 status: container.status,

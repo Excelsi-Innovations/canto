@@ -32,13 +32,19 @@ export const LOGO_LINES = [
  * Compact logo for the sidebar (fits in ~26 chars width)
  * Using simple ASCII for maximum compatibility
  */
-export const SIDEBAR_LOGO = [
-  '  ██████  █████  ███  █',
-  ' ██      ██   ██ ████ █',
-  ' ██      ███████ ██ ███',
-  ' ██      ██   ██ ██  ██',
-  '  ██████ ██   ██ ██   █',
+export const MINI_MONOLITH = [
+  '   ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄   ',
+  '   █ ▄▀▄ █ ▄▀▄ █ ▄ █ ▄▀▄ █   ',
+  '   █ █ █ █ █▄█ █ █ █ █ █ █   ',
+  '   █ ▀▄▀ █ █ █ █ ▀ █ ▀▄▀ █   ',
+  '   ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   ',
 ];
+
+/**
+ * Compact logo for the sidebar (fits in ~26 chars width)
+ * Using simple ASCII for maximum compatibility
+ */
+export const SIDEBAR_LOGO = MINI_MONOLITH;
 
 /**
  * Pessoa quote that rotates
@@ -58,7 +64,7 @@ export const PESSOA_QUOTES = [
  */
 export function getCurrentQuote(): string {
   const index = Math.floor(Date.now() / 30000) % PESSOA_QUOTES.length;
-  return PESSOA_QUOTES[index]!;
+  return PESSOA_QUOTES[index] ?? PESSOA_QUOTES[0] ?? '';
 }
 
 // -------------------------------------------------------------------
@@ -81,7 +87,7 @@ export const LOADING_MESSAGES = [
  */
 export function getLoadingMessage(): string {
   const index = Math.floor(Math.random() * LOADING_MESSAGES.length);
-  return LOADING_MESSAGES[index]!;
+  return LOADING_MESSAGES[index] ?? 'Loading...';
 }
 
 /**
@@ -131,7 +137,7 @@ export const POETIC_MESSAGES: Record<string, Record<string, string>> = {
 export function getPoeticMessage(action: string, moduleType: string): string {
   const actionMessages = POETIC_MESSAGES[action];
   if (!actionMessages) return `${action}...`;
-  return actionMessages[moduleType.toLowerCase()] || actionMessages['default'] || `${action}...`;
+  return actionMessages[moduleType.toLowerCase()] ?? actionMessages['default'] ?? `${action}...`;
 }
 
 /**
@@ -152,5 +158,5 @@ export const PULSE_COLORS = {
 export function getPulseColor(state: keyof typeof PULSE_COLORS): string {
   const palette = PULSE_COLORS[state];
   const index = Math.floor(Date.now() / 600) % palette.length;
-  return palette[index]!;
+  return palette[index] ?? palette[0] ?? '#000000';
 }

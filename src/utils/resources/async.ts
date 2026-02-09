@@ -27,7 +27,7 @@ export async function execCommand(
       encoding: 'utf8',
     });
     return stdout.trim();
-  } catch (error) {
+  } catch (_error) {
     // Silent fail - return empty string for graceful degradation
     return '';
   }

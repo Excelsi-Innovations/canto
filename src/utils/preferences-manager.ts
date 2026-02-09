@@ -12,7 +12,7 @@ const PREFS_FILE = join(homedir(), '.canto', 'preferences.json');
 export class PreferencesManager {
   private prefs: UserPreferences;
   private dirty: boolean = false;
-  private flushTimer: NodeJS.Timer | null = null;
+  private flushTimer: NodeJS.Timeout | null = null;
   private flushInterval: number = 5000; // 5 seconds
   private isShuttingDown: boolean = false;
 
@@ -62,14 +62,14 @@ export class PreferencesManager {
         const prefs = JSON.parse(data);
 
         // Convert history timestamps back to Date objects
-        prefs.history = prefs.history.map((h: any) => ({
+        prefs.history = prefs.history.map((h: Record<string, unknown>) => ({
           ...h,
-          timestamp: new Date(h.timestamp),
+          timestamp: new Date(h['timestamp'] as string | number | Date),
         }));
 
         this.prefs = prefs;
       }
-    } catch (error) {
+    } catch (_error) {
       // Use defaults on error
       this.prefs = this.getDefaultPreferences();
     }
@@ -194,7 +194,7 @@ export class PreferencesManager {
       await fs.rename(tempFile, PREFS_FILE);
 
       this.dirty = false;
-    } catch (error) {
+    } catch (_error) {
       // Silently fail on write errors
     }
   }

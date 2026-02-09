@@ -65,16 +65,16 @@ export async function logsCommand(target: string, options: LogsOptions): Promise
         (s) => s.container && (s.container.name === containerName || s.name === containerName)
       );
 
-      if (!service || !service.container) {
+      if (!service?.container) {
         console.log(
           errorBox(
             `${icons.error} Container not found`,
             `Container "${containerName}" not found in module "${moduleName}".\n\n` +
-              'Available containers:\n' +
+              `Available containers:\n${
               services
                 .filter((s) => s.container)
-                .map((s) => `  • ${s.container!.name}`)
-                .join('\n'),
+                .map((s) => `  • ${s.container?.name}`)
+                .join('\n')}`,
             ['Check: canto status', 'Make sure the container is running']
           )
         );

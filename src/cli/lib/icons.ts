@@ -13,7 +13,7 @@ export const MODULE_ICONS: Record<string, string> = {
   backend: '🔧',
   frontend: '🎨',
   api: '🔌',
-  database: '🗄️',
+  database: '',
   default: '◆',
 };
 
@@ -27,36 +27,35 @@ export const STATUS_ICONS: Record<string, string> = {
 
 export const TECH_ICONS: Record<string, string> = {
   // Frontend
-  react: '',
+  react: '',
   vue: '󰡄',
-  angular: '',
-  svelte: '',
-  next: '󰛟',
+  angular: '',
+  svelte: '',
+  next: '', // Ícone específico do Next.js
 
   // Backend
-  node: '',
-  express: '󰛟',
-  nestjs: '',
-  python: '',
-  django: '',
-  flask: '',
-
+  node: '󰎙',
+  express: '',
+  nestjs: '',
+  python: '',
+  django: '',
+  flask: '',
   // Databases
-  postgres: '',
-  mysql: '',
-  mongodb: '',
-  redis: '',
+  postgres: '',
+  mysql: '',
+  mongodb: '',
+  redis: '',
 
   // Other
-  docker: '',
+  docker: '󰡨',
   kubernetes: '󱃾',
-  git: '',
-  npm: '',
-  yarn: '',
-  pnpm: '',
-  default: '',
+  git: '󰊢',
+  npm: '',
+  yarn: '',
+  pnpm: '',
+  bun: '',
+  default: '',
 };
-
 /**
  * Get icon for module type
  */
@@ -74,14 +73,14 @@ export function getModuleIcon(type: string, name?: string): string {
   }
 
   // Fall back to module type icon
-  return MODULE_ICONS[type.toLowerCase()] || MODULE_ICONS['default'] || '◆';
+  return MODULE_ICONS[type.toLowerCase()] ?? MODULE_ICONS['default'] ?? '◆';
 }
 
 /**
  * Get icon for status
  */
 export function getStatusIcon(status: string): string {
-  return STATUS_ICONS[status.toUpperCase()] || '?';
+  return STATUS_ICONS[status.toUpperCase()] ?? '?';
 }
 
 /**
@@ -103,7 +102,7 @@ export function getStatusDisplay(status: string): {
     ERROR: { icon: '✗', label: 'Error', color: 'red' },
   };
 
-  return statusMap[status.toUpperCase()] || { icon: '?', label: status, color: 'gray' };
+  return statusMap[status.toUpperCase()] ?? { icon: '?', label: status, color: 'gray' };
 }
 
 /**
@@ -128,6 +127,6 @@ export const HOTKEY_ICONS = {
  * Get hotkey display with icon
  */
 export function getHotkeyDisplay(key: string, action: string, icon?: string): string {
-  const displayIcon = icon || HOTKEY_ICONS[action.toLowerCase() as keyof typeof HOTKEY_ICONS] || '';
+  const displayIcon = icon ?? HOTKEY_ICONS[action.toLowerCase() as keyof typeof HOTKEY_ICONS] ?? '';
   return `[${key}] ${displayIcon} ${action}`;
 }

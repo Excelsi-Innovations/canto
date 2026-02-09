@@ -54,7 +54,7 @@ export async function getResourceStats(): Promise<ResourceStats> {
       cpuCount,
       cpuUsage,
     };
-  } catch (error) {
+  } catch (_error) {
     // Return safe defaults on error
     return {
       totalMemory: 0,

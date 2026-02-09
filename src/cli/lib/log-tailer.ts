@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
-import chokidar, { FSWatcher } from 'chokidar';
+import type { FSWatcher } from 'chokidar';
+import chokidar from 'chokidar';
 
 export type LogSubscriber = (lines: string[]) => void;
 
@@ -156,7 +157,7 @@ export class LogTailer {
       this.fileWatcher.on('error', () => {
         // Silently fail on watcher errors
       });
-    } catch (error) {
+    } catch (_error) {
       // Silently fail if watching not supported
     }
   }
@@ -199,7 +200,7 @@ export class LogTailer {
 
       // Notify subscribers
       this.notifySubscribers();
-    } catch (error) {
+    } catch (_error) {
       // Silently fail on read errors
     }
   }
@@ -211,7 +212,7 @@ export class LogTailer {
     this.subscribers.forEach((callback) => {
       try {
         callback(this.lines);
-      } catch (error) {
+      } catch (_error) {
         // Ignore subscriber errors
       }
     });

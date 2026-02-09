@@ -17,7 +17,7 @@ export class AsyncResourceMonitor {
   private config: ResourceMonitorConfig;
   private latestResources: SystemResources;
   private subscribers: Set<ResourceSubscriber> = new Set();
-  private updateTimer: NodeJS.Timer | null = null;
+  private updateTimer: NodeJS.Timeout | null = null;
   private isPolling: boolean = false;
 
   constructor(config: Partial<ResourceMonitorConfig> = {}) {
@@ -114,7 +114,7 @@ export class AsyncResourceMonitor {
         this.latestResources = resources;
         this.notifySubscribers(resources);
       }
-    } catch (error) {
+    } catch (_error) {
       // Silently fail, keep using last known values
       // Don't log in production to avoid spam
     } finally {
@@ -142,7 +142,7 @@ export class AsyncResourceMonitor {
     this.subscribers.forEach((callback) => {
       try {
         callback(resources);
-      } catch (error) {
+      } catch (_error) {
         // Ignore subscriber errors
       }
     });

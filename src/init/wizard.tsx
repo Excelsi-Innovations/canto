@@ -15,7 +15,14 @@ interface InitWizardProps {
   onCancel: () => void;
 }
 
-type Step = 'welcome' | 'analyzing' | 'workspaces' | 'docker' | 'prerequisites' | 'ports' | 'confirm';
+type Step =
+  | 'welcome'
+  | 'analyzing'
+  | 'workspaces'
+  | 'docker'
+  | 'prerequisites'
+  | 'ports'
+  | 'confirm';
 
 /**
  * Interactive init wizard component with enhanced visibility
@@ -125,7 +132,10 @@ export function InitWizard({
     <Box flexDirection="column" paddingX={2} paddingY={1}>
       {/* Header */}
       <Box marginBottom={1}>
-        <Text bold backgroundColor="cyan" color="black"> 🎵 CANTO INIT WIZARD </Text>
+        <Text bold backgroundColor="cyan" color="black">
+          {' '}
+          🎵 CANTO INIT WIZARD{' '}
+        </Text>
       </Box>
 
       {/* Main Content */}
@@ -150,20 +160,38 @@ export function InitWizard({
       <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={2}>
         {step === 'confirm' ? (
           <Text>
-            <Text backgroundColor="green" color="black" bold> Y </Text>
-            <Text> Generate Config  </Text>
-            <Text backgroundColor="red" color="white" bold> N </Text>
-            <Text> Cancel  </Text>
-            <Text backgroundColor="gray" color="white" bold> ESC </Text>
+            <Text backgroundColor="green" color="black" bold>
+              {' '}
+              Y{' '}
+            </Text>
+            <Text> Generate Config </Text>
+            <Text backgroundColor="red" color="white" bold>
+              {' '}
+              N{' '}
+            </Text>
+            <Text> Cancel </Text>
+            <Text backgroundColor="gray" color="white" bold>
+              {' '}
+              ESC{' '}
+            </Text>
             <Text> Exit</Text>
           </Text>
         ) : (
           <Text>
-            <Text backgroundColor="green" color="black" bold> ↵ ENTER </Text>
-            <Text> Continue  </Text>
-            <Text backgroundColor="yellow" color="black" bold> N </Text>
-            <Text> No  </Text>
-            <Text backgroundColor="gray" color="white" bold> ESC </Text>
+            <Text backgroundColor="green" color="black" bold>
+              {' '}
+              ↵ ENTER{' '}
+            </Text>
+            <Text> Continue </Text>
+            <Text backgroundColor="yellow" color="black" bold>
+              {' '}
+              N{' '}
+            </Text>
+            <Text> No </Text>
+            <Text backgroundColor="gray" color="white" bold>
+              {' '}
+              ESC{' '}
+            </Text>
             <Text> Cancel</Text>
           </Text>
         )}
@@ -191,7 +219,9 @@ function WelcomeStep({ detection }: { detection: ProjectDetectionResult }): Reac
   return (
     <Box flexDirection="column" gap={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">✨ WELCOME TO CANTO!</Text>
+        <Text bold color="cyan">
+          ✨ WELCOME TO CANTO!
+        </Text>
       </Box>
 
       <Box>
@@ -199,32 +229,56 @@ function WelcomeStep({ detection }: { detection: ProjectDetectionResult }): Reac
       </Box>
 
       {/* Project Info - High Contrast */}
-      <Box flexDirection="column" marginY={1} borderStyle="single" borderColor="blue" paddingX={2} paddingY={1}>
+      <Box
+        flexDirection="column"
+        marginY={1}
+        borderStyle="single"
+        borderColor="blue"
+        paddingX={2}
+        paddingY={1}
+      >
         <Box>
-          <Text backgroundColor="blue" color="white" bold> PROJECT </Text>
+          <Text backgroundColor="blue" color="white" bold>
+            {' '}
+            PROJECT{' '}
+          </Text>
         </Box>
         <Box marginTop={1}>
           <Text bold>Type: </Text>
-          <Text backgroundColor="magenta" color="white" bold> {detection.projectType.toUpperCase()} </Text>
+          <Text backgroundColor="magenta" color="white" bold>
+            {' '}
+            {detection.projectType.toUpperCase()}{' '}
+          </Text>
         </Box>
         <Box>
           <Text bold>Package Manager: </Text>
-          <Text backgroundColor="yellow" color="black" bold> {detection.packageManager.toUpperCase()} </Text>
+          <Text backgroundColor="yellow" color="black" bold>
+            {' '}
+            {detection.packageManager.toUpperCase()}{' '}
+          </Text>
         </Box>
         <Box>
           <Text bold>Workspaces: </Text>
-          <Text backgroundColor="green" color="black" bold> {detection.workspaces.length} </Text>
+          <Text backgroundColor="green" color="black" bold>
+            {' '}
+            {detection.workspaces.length}{' '}
+          </Text>
         </Box>
         {detection.docker.composeFiles.length > 0 && (
           <Box>
             <Text bold>Docker Compose: </Text>
-            <Text backgroundColor="blue" color="white" bold> {detection.docker.composeFiles.length} file(s) </Text>
+            <Text backgroundColor="blue" color="white" bold>
+              {' '}
+              {detection.docker.composeFiles.length} file(s){' '}
+            </Text>
           </Box>
         )}
       </Box>
 
       <Box marginTop={1}>
-        <Text bold color="green">👉 Ready to configure? Let's go!</Text>
+        <Text bold color="green">
+          👉 Ready to configure? Let's go!
+        </Text>
       </Box>
     </Box>
   );
@@ -238,27 +292,47 @@ function WorkspacesStep({
   return (
     <Box flexDirection="column" gap={1}>
       <Box marginBottom={1}>
-        <Text backgroundColor="green" color="black" bold> 📦 DETECTED WORKSPACES </Text>
+        <Text backgroundColor="green" color="black" bold>
+          {' '}
+          📦 DETECTED WORKSPACES{' '}
+        </Text>
       </Box>
 
-      <Box flexDirection="column" marginY={1} borderStyle="single" borderColor="green" paddingX={2} paddingY={1}>
+      <Box
+        flexDirection="column"
+        marginY={1}
+        borderStyle="single"
+        borderColor="green"
+        paddingX={2}
+        paddingY={1}
+      >
         {workspaces.slice(0, 8).map((workspace, idx) => (
           <Box key={workspace.name}>
-            <Text backgroundColor="green" color="white" bold> {idx + 1} </Text>
+            <Text backgroundColor="green" color="white" bold>
+              {' '}
+              {idx + 1}{' '}
+            </Text>
             <Text> </Text>
-            <Text bold color="white">{workspace.name}</Text>
+            <Text bold color="white">
+              {workspace.name}
+            </Text>
             <Text dimColor> ({workspace.path.split(/[/\\]/).slice(-2).join('/')})</Text>
           </Box>
         ))}
         {workspaces.length > 8 && (
           <Box marginTop={1}>
-            <Text backgroundColor="blue" color="white" bold> +{workspaces.length - 8} more </Text>
+            <Text backgroundColor="blue" color="white" bold>
+              {' '}
+              +{workspaces.length - 8} more{' '}
+            </Text>
           </Box>
         )}
       </Box>
 
       <Box>
-        <Text bold color="yellow">💡 All workspaces will be included</Text>
+        <Text bold color="yellow">
+          💡 All workspaces will be included
+        </Text>
       </Box>
     </Box>
   );
@@ -269,10 +343,13 @@ function DockerStep({ docker }: { docker: ProjectDetectionResult['docker'] }): R
     return (
       <Box flexDirection="column" gap={1}>
         <Box marginBottom={1}>
-          <Text backgroundColor="gray" color="white" bold> 🐳 DOCKER CONFIGURATION </Text>
+          <Text backgroundColor="gray" color="white" bold>
+            {' '}
+            🐳 DOCKER CONFIGURATION{' '}
+          </Text>
         </Box>
         <Box borderStyle="single" borderColor="yellow" paddingX={2} paddingY={1}>
-          <Text color="yellow">⚠️  No Docker Compose files detected. Skipping...</Text>
+          <Text color="yellow">⚠️ No Docker Compose files detected. Skipping...</Text>
         </Box>
       </Box>
     );
@@ -281,23 +358,33 @@ function DockerStep({ docker }: { docker: ProjectDetectionResult['docker'] }): R
   return (
     <Box flexDirection="column" gap={1}>
       <Box marginBottom={1}>
-        <Text backgroundColor="blue" color="white" bold> 🐳 DOCKER CONFIGURATION </Text>
+        <Text backgroundColor="blue" color="white" bold>
+          {' '}
+          🐳 DOCKER CONFIGURATION{' '}
+        </Text>
       </Box>
 
       <Box flexDirection="column" borderStyle="single" borderColor="blue" paddingX={2} paddingY={1}>
         <Text bold>Found Docker Compose files:</Text>
         {docker.composeFiles.map((file, idx) => (
           <Box key={file} marginTop={1}>
-            <Text backgroundColor="blue" color="white" bold> {idx + 1} </Text>
+            <Text backgroundColor="blue" color="white" bold>
+              {' '}
+              {idx + 1}{' '}
+            </Text>
             <Text> </Text>
-            <Text bold color="cyan">{file}</Text>
+            <Text bold color="cyan">
+              {file}
+            </Text>
           </Box>
         ))}
       </Box>
 
       <Box marginTop={1}>
         <Text bold>Include Docker infrastructure? </Text>
-        <Text color="green" bold>(Recommended)</Text>
+        <Text color="green" bold>
+          (Recommended)
+        </Text>
       </Box>
     </Box>
   );
@@ -307,15 +394,27 @@ function PrerequisitesStep(): React.JSX.Element {
   return (
     <Box flexDirection="column" gap={1}>
       <Box marginBottom={1}>
-        <Text backgroundColor="cyan" color="black" bold> ✅ PREREQUISITES VALIDATION </Text>
+        <Text backgroundColor="cyan" color="black" bold>
+          {' '}
+          ✅ PREREQUISITES VALIDATION{' '}
+        </Text>
       </Box>
 
       <Box>
         <Text>Add automatic prerequisite checks before starting modules?</Text>
       </Box>
 
-      <Box flexDirection="column" marginY={1} borderStyle="single" borderColor="cyan" paddingX={2} paddingY={1}>
-        <Text bold color="white">This will validate:</Text>
+      <Box
+        flexDirection="column"
+        marginY={1}
+        borderStyle="single"
+        borderColor="cyan"
+        paddingX={2}
+        paddingY={1}
+      >
+        <Text bold color="white">
+          This will validate:
+        </Text>
         <Box marginTop={1}>
           <Text color="green">✓</Text>
           <Text> Docker installation & daemon status</Text>
@@ -331,7 +430,9 @@ function PrerequisitesStep(): React.JSX.Element {
       </Box>
 
       <Box>
-        <Text bold color="yellow">💡 Prevents runtime errors - Highly recommended!</Text>
+        <Text bold color="yellow">
+          💡 Prevents runtime errors - Highly recommended!
+        </Text>
       </Box>
     </Box>
   );
@@ -341,15 +442,27 @@ function PortsStep(): React.JSX.Element {
   return (
     <Box flexDirection="column" gap={1}>
       <Box marginBottom={1}>
-        <Text backgroundColor="magenta" color="white" bold> 🔌 PORT ALLOCATION </Text>
+        <Text backgroundColor="magenta" color="white" bold>
+          {' '}
+          🔌 PORT ALLOCATION{' '}
+        </Text>
       </Box>
 
       <Box>
         <Text bold>Enable automatic port allocation?</Text>
       </Box>
 
-      <Box flexDirection="column" marginY={1} borderStyle="single" borderColor="magenta" paddingX={2} paddingY={1}>
-        <Text bold color="white">Smart port management:</Text>
+      <Box
+        flexDirection="column"
+        marginY={1}
+        borderStyle="single"
+        borderColor="magenta"
+        paddingX={2}
+        paddingY={1}
+      >
+        <Text bold color="white">
+          Smart port management:
+        </Text>
         <Box marginTop={1}>
           <Text color="cyan">→</Text>
           <Text> Automatically detects port conflicts</Text>
@@ -365,7 +478,9 @@ function PortsStep(): React.JSX.Element {
       </Box>
 
       <Box>
-        <Text bold color="yellow">💡 Saves time debugging port conflicts!</Text>
+        <Text bold color="yellow">
+          💡 Saves time debugging port conflicts!
+        </Text>
       </Box>
     </Box>
   );
@@ -387,61 +502,111 @@ function ConfirmStep({
   return (
     <Box flexDirection="column" gap={1}>
       <Box marginBottom={1}>
-        <Text backgroundColor="cyan" color="black" bold> 📋 CONFIGURATION SUMMARY </Text>
+        <Text backgroundColor="cyan" color="black" bold>
+          {' '}
+          📋 CONFIGURATION SUMMARY{' '}
+        </Text>
       </Box>
 
       {/* Summary Table */}
       <Box flexDirection="column" borderStyle="double" borderColor="cyan" paddingX={2} paddingY={1}>
         <Box>
-          <Text bold dimColor>Project Type:</Text>
+          <Text bold dimColor>
+            Project Type:
+          </Text>
           <Text> </Text>
-          <Text backgroundColor="magenta" color="white" bold> {detection.projectType.toUpperCase()} </Text>
+          <Text backgroundColor="magenta" color="white" bold>
+            {' '}
+            {detection.projectType.toUpperCase()}{' '}
+          </Text>
         </Box>
         <Box marginTop={1}>
-          <Text bold dimColor>Package Manager:</Text>
+          <Text bold dimColor>
+            Package Manager:
+          </Text>
           <Text> </Text>
-          <Text backgroundColor="yellow" color="black" bold> {detection.packageManager.toUpperCase()} </Text>
+          <Text backgroundColor="yellow" color="black" bold>
+            {' '}
+            {detection.packageManager.toUpperCase()}{' '}
+          </Text>
         </Box>
         <Box marginTop={1}>
-          <Text bold dimColor>Workspaces:</Text>
+          <Text bold dimColor>
+            Workspaces:
+          </Text>
           <Text> </Text>
-          <Text backgroundColor="green" color="black" bold> {selectedWorkspaces.length} modules </Text>
+          <Text backgroundColor="green" color="black" bold>
+            {' '}
+            {selectedWorkspaces.length} modules{' '}
+          </Text>
         </Box>
         {detection.docker.composeFiles.length > 0 && (
           <Box marginTop={1}>
-            <Text bold dimColor>Docker:</Text>
+            <Text bold dimColor>
+              Docker:
+            </Text>
             <Text> </Text>
             {includeDocker ? (
-              <Text backgroundColor="blue" color="white" bold> ✓ ENABLED ({detection.docker.composeFiles.length} file{detection.docker.composeFiles.length > 1 ? 's' : ''}) </Text>
+              <Text backgroundColor="blue" color="white" bold>
+                {' '}
+                ✓ ENABLED ({detection.docker.composeFiles.length} file
+                {detection.docker.composeFiles.length > 1 ? 's' : ''}){' '}
+              </Text>
             ) : (
-              <Text backgroundColor="red" color="white" bold> ✗ DISABLED </Text>
+              <Text backgroundColor="red" color="white" bold>
+                {' '}
+                ✗ DISABLED{' '}
+              </Text>
             )}
           </Box>
         )}
         <Box marginTop={1}>
-          <Text bold dimColor>Prerequisites:</Text>
+          <Text bold dimColor>
+            Prerequisites:
+          </Text>
           <Text> </Text>
           {includePrerequisites ? (
-            <Text backgroundColor="green" color="black" bold> ✓ ENABLED </Text>
+            <Text backgroundColor="green" color="black" bold>
+              {' '}
+              ✓ ENABLED{' '}
+            </Text>
           ) : (
-            <Text backgroundColor="yellow" color="black" bold> ✗ DISABLED </Text>
+            <Text backgroundColor="yellow" color="black" bold>
+              {' '}
+              ✗ DISABLED{' '}
+            </Text>
           )}
         </Box>
         <Box marginTop={1}>
-          <Text bold dimColor>Auto Ports:</Text>
+          <Text bold dimColor>
+            Auto Ports:
+          </Text>
           <Text> </Text>
           {autoAllocatePorts ? (
-            <Text backgroundColor="green" color="black" bold> ✓ ENABLED </Text>
+            <Text backgroundColor="green" color="black" bold>
+              {' '}
+              ✓ ENABLED{' '}
+            </Text>
           ) : (
-            <Text backgroundColor="yellow" color="black" bold> ✗ DISABLED </Text>
+            <Text backgroundColor="yellow" color="black" bold>
+              {' '}
+              ✗ DISABLED{' '}
+            </Text>
           )}
         </Box>
       </Box>
 
       <Box marginTop={1}>
-        <Text bold color="cyan">Generate </Text>
-        <Text backgroundColor="cyan" color="black" bold> dev.config.yaml </Text>
-        <Text bold color="cyan">?</Text>
+        <Text bold color="cyan">
+          Generate{' '}
+        </Text>
+        <Text backgroundColor="cyan" color="black" bold>
+          {' '}
+          dev.config.yaml{' '}
+        </Text>
+        <Text bold color="cyan">
+          ?
+        </Text>
       </Box>
     </Box>
   );

@@ -120,9 +120,9 @@ export class ResourceHistory {
     // Build braille characters, 2 data points per char
     const chars: string[] = [];
     for (let i = 0; i < needed; i += 2) {
-      const leftVal = levels[i]!;
-      const rightVal = levels[i + 1]!;
-      const codePoint = 0x2800 + leftDots[leftVal]! + rightDots[rightVal]!;
+      const leftVal = levels[i] ?? 0;
+      const rightVal = levels[i + 1] ?? 0;
+      const codePoint = 0x2800 + (leftDots[leftVal] ?? 0) + (rightDots[rightVal] ?? 0);
       chars.push(String.fromCharCode(codePoint));
     }
 

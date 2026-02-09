@@ -31,7 +31,7 @@ export const ModuleCard: React.FC<ModuleCardProps> = React.memo(
       ERROR: { icon: statusIcon, color: theme.colors.error },
     };
 
-    const status = statusConfig[module.status as keyof typeof statusConfig] || {
+    const status = statusConfig[module.status as keyof typeof statusConfig] ?? {
       icon: '?',
       color: theme.colors.muted,
     };
@@ -43,11 +43,11 @@ export const ModuleCard: React.FC<ModuleCardProps> = React.memo(
     const alerts = checkResourceAlerts(module);
     const criticalAlert = alerts.find((a) => a.level === 'critical');
     const warningAlert = alerts.find((a) => a.level === 'warning');
-    const alert = criticalAlert || warningAlert;
+    const alert = criticalAlert ?? warningAlert;
 
     // Format auto-restart info
     const autoRestartInfo = useMemo(() => {
-      if (!autoRestartState || !autoRestartState.nextRetryAt) return null;
+      if (!autoRestartState?.nextRetryAt) return null;
 
       const now = Date.now();
       const nextRetry = autoRestartState.nextRetryAt.getTime();
@@ -73,7 +73,7 @@ export const ModuleCard: React.FC<ModuleCardProps> = React.memo(
     };
 
     // Collect all ports from containers for inline display
-    const allPorts = (module.containers || []).flatMap((c) => c.ports).filter((p) => p.length > 0);
+    const allPorts = (module.containers ?? []).flatMap((c) => c.ports).filter((p) => p.length > 0);
 
     return (
       <Box
@@ -201,8 +201,8 @@ export const ModuleCard: React.FC<ModuleCardProps> = React.memo(
     if (!areEqual) return false;
 
     // Compare containers
-    const prevContainers = prevProps.module.containers || [];
-    const nextContainers = nextProps.module.containers || [];
+    const prevContainers = prevProps.module.containers ?? [];
+    const nextContainers = nextProps.module.containers ?? [];
     if (prevContainers.length !== nextContainers.length) return false;
 
     // Compare autoRestartState

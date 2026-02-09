@@ -159,7 +159,7 @@ function showPorts(envFiles: EnvFile[]): void {
   // Group by source file
   const byFile = new Map<string, typeof ports>();
   for (const port of ports) {
-    const existing = byFile.get(port.source) || [];
+    const existing = byFile.get(port.source) ?? [];
     existing.push(port);
     byFile.set(port.source, existing);
   }
@@ -171,9 +171,7 @@ function showPorts(envFiles: EnvFile[]): void {
     console.log(colors.bold(`📄 ${source}${moduleLabel}\n`));
 
     for (const port of portList.sort((a, b) => a.value - b.value)) {
-      console.log(
-        `  ${colors.cyan(`${port.key.padEnd(25)}`)} ${colors.bold(`:${port.value}`)}`
-      );
+      console.log(`  ${colors.cyan(`${port.key.padEnd(25)}`)} ${colors.bold(`:${port.value}`)}`);
     }
     console.log();
   }
@@ -204,9 +202,7 @@ function checkMissingVariables(envFiles: EnvFile[]): void {
     const examplePath = findEnvExample(envFile.path);
 
     if (!examplePath) {
-      console.log(
-        colors.dim(`${icons.info} ${envFile.relativePath} - No example file found\n`)
-      );
+      console.log(colors.dim(`${icons.info} ${envFile.relativePath} - No example file found\n`));
       continue;
     }
 
@@ -291,11 +287,10 @@ function compareEnv(envFiles: EnvFile[], targetPath: string): void {
   const examplePath = findEnvExample(envFile.path);
   if (!examplePath) {
     console.log(
-      errorBox(
-        `${icons.error} No example file`,
-        `No example file found for "${targetPath}".`,
-        ['Create a .env.example file', 'Specify a different env file']
-      )
+      errorBox(`${icons.error} No example file`, `No example file found for "${targetPath}".`, [
+        'Create a .env.example file',
+        'Specify a different env file',
+      ])
     );
     process.exit(1);
   }
@@ -313,7 +308,9 @@ function compareEnv(envFiles: EnvFile[], targetPath: string): void {
   const comparison = compareEnvFiles(envFile, exampleFile);
 
   if (comparison.missing.length > 0) {
-    console.log(colors.error(colors.bold(`\n${icons.error} Missing (${comparison.missing.length})`)));
+    console.log(
+      colors.error(colors.bold(`\n${icons.error} Missing (${comparison.missing.length})`))
+    );
     console.log(colors.dim('These variables exist in example but not in your .env:\n'));
     for (const key of comparison.missing) {
       // Find the variable in example to show its comment
@@ -327,7 +324,9 @@ function compareEnv(envFiles: EnvFile[], targetPath: string): void {
   }
 
   if (comparison.extra.length > 0) {
-    console.log(colors.yellow(colors.bold(`\n${icons.warning} Extra (${comparison.extra.length})`)));
+    console.log(
+      colors.yellow(colors.bold(`\n${icons.warning} Extra (${comparison.extra.length})`))
+    );
     console.log(colors.dim('These variables exist in your .env but not in example:\n'));
     for (const key of comparison.extra) {
       console.log(`  ${colors.yellow(key)}`);
@@ -336,7 +335,9 @@ function compareEnv(envFiles: EnvFile[], targetPath: string): void {
   }
 
   if (comparison.common.length > 0) {
-    console.log(colors.success(colors.bold(`\n${icons.success} In Sync (${comparison.common.length})`)));
+    console.log(
+      colors.success(colors.bold(`\n${icons.success} In Sync (${comparison.common.length})`))
+    );
     console.log(colors.dim('These variables exist in both files:\n'));
     for (const key of comparison.common.slice(0, 10)) {
       console.log(`  ${colors.dim('•')} ${key}`);

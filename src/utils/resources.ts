@@ -41,7 +41,7 @@ export function getProcessResources(pid: number): ProcessResources | null {
 
       const data = JSON.parse(output);
       const memoryMB = data.WorkingSet / (1024 * 1024);
-      
+
       // Get total memory for percentage calculation
       const totalMemOutput = execSync(
         'powershell "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory"',
@@ -68,13 +68,13 @@ export function getProcessResources(pid: number): ProcessResources | null {
 
       const secondLine = lines[1];
       if (!secondLine) return null;
-      
+
       const parts = secondLine.trim().split(/\s+/);
       if (parts.length < 3) return null;
-      
+
       const [cpu, mem, rss] = parts;
       if (!cpu || !mem || !rss) return null;
-      
+
       const memoryMB = parseInt(rss) / 1024;
 
       return {
@@ -84,7 +84,7 @@ export function getProcessResources(pid: number): ProcessResources | null {
         memoryPercent: parseFloat(mem),
       };
     }
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
@@ -148,7 +148,8 @@ export function getSystemResources(): SystemResources {
       const inactivePages = getPages(lines.find((l) => l.includes('Pages inactive')));
       const wiredPages = getPages(lines.find((l) => l.includes('Pages wired down')));
 
-      const totalMemory = (execSync('sysctl hw.memsize', { encoding: 'utf-8' }).match(/\d+/) ?? ['0'])[0] ?? '0';
+      const totalMemory =
+        (execSync('sysctl hw.memsize', { encoding: 'utf-8' }).match(/\d+/) ?? ['0'])[0] ?? '0';
       const total = parseInt(totalMemory) / (1024 * 1024);
       const freeMemory = (freePages * pageSize) / (1024 * 1024);
       const usedMemory = ((activePages + inactivePages + wiredPages) * pageSize) / (1024 * 1024);
@@ -196,7 +197,7 @@ export function getSystemResources(): SystemResources {
         cpuUsage,
       };
     }
-  } catch (error) {
+  } catch (_error) {
     // Return default values on error
     return {
       totalMemory: 0,
@@ -220,10 +221,10 @@ export function createBar(value: number, max: number, width: number = 20): strin
   const percentage = Math.min((value / max) * 100, 100);
   const filledWidth = Math.round((percentage / 100) * width);
   const emptyWidth = width - filledWidth;
-  
+
   const filled = '█'.repeat(filledWidth);
   const empty = '░'.repeat(emptyWidth);
-  
+
   return `${filled}${empty}`;
 }
 

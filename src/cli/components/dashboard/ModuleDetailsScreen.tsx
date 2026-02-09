@@ -120,7 +120,7 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
         unsubscribe();
         logTailer.stop();
       };
-    }, [module.name]); // logTailer é estável, não precisa estar nas dependências
+    }, [module.name, logTailer]);
 
     useInput((input, key) => {
       if (input === 'q' || input === 'Q') {
@@ -215,7 +215,7 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
                     <Text bold>Path:</Text> {moduleConfig.path}
                   </Text>
                   <Text>
-                    <Text bold>Package Manager:</Text> {moduleConfig.packageManager || 'auto'}
+                    <Text bold>Package Manager:</Text> {moduleConfig.packageManager ?? 'auto'}
                   </Text>
                   {moduleConfig.run.dev && (
                     <Text>

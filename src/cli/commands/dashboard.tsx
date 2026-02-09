@@ -1,251 +1,55 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { render, Box, Text, useInput, useApp } from 'ink';
-import { execSync } from 'child_process';
-import path from 'path';
-import Fuse from 'fuse.js';
-import { ProcessManager } from '../../processes/manager.js';
-import { ModuleOrchestrator } from '../../modules/index.js';
-import { DockerExecutor } from '../../modules/docker.js';
-import { createBar, formatMemory, type SystemResources } from '../../utils/resources.js';
-import { getPreferencesManager } from '../../utils/preferences-manager.js';
-import { AsyncResourceMonitor } from '../lib/resource-monitor.js';
-import { DashboardDataManager } from '../lib/dashboard-data-manager.js';
-import { ResourceHistory } from '../lib/resource-history.js';
-import { checkResourceAlerts, type ResourceAlert } from '../lib/resource-alerts.js';
-import { AutoRestartManager } from '../lib/auto-restart-manager.js';
+import React, { useState, useMemo } from 'react';
+import { render, Box, Text, useApp } from 'ink';
+import Fuse, { type FuseResult } from 'fuse.js';
 import type { ModuleStatus, Screen } from '../types.js';
 import { ModuleCard } from '../components/dashboard/ModuleCard.js';
 import { Sidebar } from '../components/dashboard/Sidebar.js';
 import { ModernHeader } from '../components/dashboard/ModernHeader.js';
-import { HelpScreen } from '../components/dashboard/HelpScreen.js';
-import { EnvScreen } from '../components/dashboard/EnvScreen.js';
-import { LogsScreen } from '../components/dashboard/LogsScreen.js';
-import { HistoryScreen } from '../components/dashboard/HistoryScreen.js';
-import { ModuleDetailsScreen } from '../components/dashboard/ModuleDetailsScreen.js';
-import { Toast, type ToastData } from '../components/dashboard/Toast.js';
-import { SplashScreen } from '../components/dashboard/SplashScreen.js';
-import { THEMES, type Theme } from '../../utils/preferences.js';
-import { getPoeticMessage } from '../lib/branding.js';
+import { Toast } from '../components/dashboard/Toast.js';
+import { SearchModal } from '../components/dashboard/SearchModal.js';
+import { ErrorBoundary } from '../components/common/ErrorBoundary.js';
+import { ScreenRouter } from '../components/dashboard/ScreenRouter.js';
+import { useDashboardData } from '../hooks/useDashboardData.js';
+import { useDashboardInput } from '../hooks/useDashboardInput.js';
+import { createBar } from '../../utils/resources.js';
 
-const Dashboard: React.FC = () => {
+const DashboardContent: React.FC = () => {
   const { exit } = useApp();
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [selectedModule, setSelectedModule] = useState(0);
-  const [modules, setModules] = useState<ModuleStatus[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [systemResources, setSystemResources] = useState<SystemResources>({
-    totalMemory: 0,
-    usedMemory: 0,
-    freeMemory: 0,
-    cpuCount: 1,
-    cpuUsage: 0,
-  });
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [lastKey, setLastKey] = useState<string | null>(null);
-  const [toasts, setToasts] = useState<ToastData[]>([]);
   const [confirmAction, setConfirmAction] = useState<{
     action: 'stop' | 'restart' | 'bulk-start' | 'bulk-stop' | 'bulk-restart';
     moduleName?: string;
     moduleNames?: string[];
   } | null>(null);
   const [selectedModules, setSelectedModules] = useState<Set<string>>(new Set());
-  const [bulkOperationProgress, setBulkOperationProgress] = useState<{
-    total: number;
-    completed: number;
-    operation: string;
-  } | null>(null);
-  const [forceUpdate, setForceUpdate] = useState(0);
 
-  const [processManager] = useState(() => new ProcessManager());
-  const [orchestrator] = useState(() => new ModuleOrchestrator(processManager));
-  const [dockerExecutor] = useState(() => new DockerExecutor(processManager));
+  // Data Hook
+  const data = useDashboardData();
+  const {
+    modules,
+    loading,
+    error,
+    isProcessing,
+    systemResources,
+    toasts,
+    bulkOperationProgress,
+    prefsManager,
+    resourceHistory,
+    autoRestartManager,
+    gitBranch,
+    cwdName,
+    nodeVersion,
+    theme,
+    orchestrator,
+  } = data;
 
-  const [resourceMonitor] = useState(() => new AsyncResourceMonitor());
-  const [dataManager] = useState(
-    () => new DashboardDataManager(orchestrator, processManager, dockerExecutor)
-  );
-  const [prefsManager] = useState(() => getPreferencesManager());
-  const [resourceHistory] = useState(() => new ResourceHistory(30));
-  const [autoRestartManager] = useState(() => new AutoRestartManager());
-
-  const shownCriticalAlerts = useRef<Set<string>>(new Set());
-  const shownAutoRestartAlerts = useRef<Set<string>>(new Set());
-
-  // System info for status bar (computed once at mount)
-  const [gitBranch] = useState<string>(() => {
-    try {
-      return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
-    } catch {
-      return '';
-    }
-  });
-  const cwdName = useMemo(() => path.basename(process.cwd()), []);
-  const nodeVersion = process.version;
-
-  const theme: Theme = useMemo(() => {
-    const themeName = prefsManager.getTheme();
-    return THEMES[themeName] || THEMES['default']!;
-  }, [forceUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (lastKey) {
-      const timer = setTimeout(() => {
-        setLastKey(null);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [lastKey]);
-
-  useEffect(() => {
-    if (toasts.length > 0) {
-      const timer = setTimeout(() => {
-        setToasts((prev) => prev.slice(1));
-      }, 1500); // Reduced from 3000ms to 1500ms
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [toasts]);
-
-  const showToast = useCallback((message: string, type: ToastData['type']) => {
-    const newToast: ToastData = {
-      id: `${Date.now()}-${Math.random()}`,
-      message,
-      type,
-    };
-    setToasts((prev) => {
-      // Remove duplicates of the same message to avoid spam
-      const filtered = prev.filter((t) => t.message !== message);
-      // Keep only the last 2 toasts + the new one (max 3 visible)
-      const trimmed = filtered.slice(-2);
-      return [...trimmed, newToast];
-    });
-  }, []);
-
-  const triggerUpdate = useCallback(() => {
-    setForceUpdate((prev) => prev + 1);
-    dataManager.forceUpdate();
-  }, [dataManager]);
-
-  useEffect(() => {
-    resourceMonitor.start();
-    const unsubscribe = resourceMonitor.subscribe((resources) => {
-      setSystemResources(resources);
-      resourceHistory.addDataPoint(resources.cpuUsage, resources.usedMemory);
-    });
-    return () => {
-      unsubscribe();
-      resourceMonitor.stop();
-    };
-  }, [resourceMonitor, resourceHistory]);
-
-  useEffect(() => {
-    const initializeData = async () => {
-      try {
-        // Show splash screen for at least 2.5s so users can see the Monolith
-        const [result] = await Promise.allSettled([
-          dataManager.initialize(),
-          new Promise((resolve) => setTimeout(resolve, 2500)),
-        ]);
-        if (result.status === 'rejected') {
-          throw result.reason;
-        }
-        setLoading(false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-        setLoading(false);
-      }
-    };
-
-    initializeData();
-
-    const unsubscribe = dataManager.subscribe((moduleStatuses) => {
-      setModules(moduleStatuses);
-
-      const newAlerts: ResourceAlert[] = [];
-      moduleStatuses.forEach((module) => {
-        const alerts = checkResourceAlerts(module);
-        newAlerts.push(...alerts);
-      });
-
-      newAlerts.forEach((alert) => {
-        if (alert.level === 'critical') {
-          const alertKey = `${alert.moduleName}-${alert.type}`;
-          if (!shownCriticalAlerts.current.has(alertKey)) {
-            shownCriticalAlerts.current.add(alertKey);
-            const icon = alert.type === 'cpu' ? 'CPU' : 'RAM';
-            const value =
-              alert.type === 'cpu' ? `${alert.value.toFixed(1)}%` : formatMemory(alert.value);
-            showToast(`🔥 ${alert.moduleName} ${icon} at ${value}!`, 'error');
-          }
-        }
-      });
-    });
-
-    return () => {
-      unsubscribe();
-      dataManager.cleanup();
-    };
-  }, [dataManager, showToast]);
-
-  useEffect(() => {
-    modules.forEach((module) => {
-      const state = autoRestartManager.getState(module.name);
-
-      if (module.status === 'ERROR' && (!state || !state.isRestarting)) {
-        const restartKey = `${module.name}-restart`;
-
-        if (!shownAutoRestartAlerts.current.has(restartKey)) {
-          const shouldRestart = autoRestartManager.registerFailure(module.name);
-
-          if (shouldRestart) {
-            shownAutoRestartAlerts.current.add(restartKey);
-
-            autoRestartManager.scheduleRestart(
-              module.name,
-              async () => {
-                await orchestrator.start(module.name);
-                prefsManager.addToHistory(`auto-restart ${module.name}`, module.name, true);
-                showToast(`✓ Auto-restarted ${module.name}`, 'success');
-                dataManager.markDirty(module.name);
-                triggerUpdate();
-                shownAutoRestartAlerts.current.delete(restartKey);
-              },
-              (delay) => {
-                const moduleType = module.type || 'default';
-                const poeticMsg = getPoeticMessage('autoRestart', moduleType);
-                const seconds = Math.ceil(delay / 1000);
-                showToast(`${poeticMsg} (${seconds}s)`, 'info');
-              }
-            );
-          }
-        }
-      }
-
-      if (module.status === 'RUNNING' && state) {
-        autoRestartManager.resetState(module.name);
-        shownAutoRestartAlerts.current.delete(`${module.name}-restart`);
-      }
-    });
-  }, [modules, autoRestartManager, orchestrator, prefsManager, showToast, triggerUpdate]);
-
-  useEffect(() => {
-    return () => {
-      autoRestartManager.cleanup();
-    };
-  }, [autoRestartManager]);
-
+  // Filter & Sort Logic (kept here as it depends on local UI state like search/sort preference)
+  // We could move this to a hook too, but it's lightweight enough here for now.
   const filteredModules = useMemo(() => {
     if (!debouncedSearchQuery) return modules;
     const fuse = new Fuse(modules, {
@@ -254,7 +58,7 @@ const Dashboard: React.FC = () => {
       ignoreLocation: true,
     });
     const results = fuse.search(debouncedSearchQuery);
-    return results.map((result) => result.item);
+    return results.map((result: FuseResult<ModuleStatus>) => result.item);
   }, [modules, debouncedSearchQuery]);
 
   const sortedModules = useMemo(() => {
@@ -270,320 +74,13 @@ const Dashboard: React.FC = () => {
         STOPPING: 2,
         STOPPED: 1,
       };
-      const aPriority = statusPriority[a.status] || 0;
-      const bPriority = statusPriority[b.status] || 0;
+      const aPriority = statusPriority[a.status] ?? 0;
+      const bPriority = statusPriority[b.status] ?? 0;
       if (aPriority !== bPriority) return bPriority - aPriority;
 
       return a.name.localeCompare(b.name);
     });
   }, [filteredModules, prefsManager]);
-
-  const executeModuleAction = useCallback(
-    async (action: 'start' | 'stop' | 'restart', moduleName: string) => {
-      if (isProcessing) return;
-
-      // Find the module to get its type for poetic messages
-      const targetModule = modules.find((m) => m.name === moduleName);
-      const moduleType = targetModule?.type || 'default';
-
-      try {
-        setIsProcessing(true);
-        showToast(getPoeticMessage(action, moduleType), 'info');
-        if (action === 'start') {
-          await orchestrator.start(moduleName);
-          prefsManager.addToHistory(`start ${moduleName}`, moduleName, true);
-          showToast(`✓ Started ${moduleName}`, 'success');
-        } else if (action === 'stop') {
-          await orchestrator.stop(moduleName);
-          prefsManager.addToHistory(`stop ${moduleName}`, moduleName, true);
-          showToast(`✓ Stopped ${moduleName}`, 'success');
-        } else if (action === 'restart') {
-          await orchestrator.restart(moduleName);
-          prefsManager.addToHistory(`restart ${moduleName}`, moduleName, true);
-          showToast(`✓ Restarted ${moduleName}`, 'success');
-        }
-        dataManager.markDirty(moduleName);
-        triggerUpdate();
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        showToast(getPoeticMessage('error', moduleType), 'error');
-        setError(errorMsg);
-        prefsManager.addToHistory(`${action} ${moduleName}`, moduleName, false);
-      } finally {
-        setIsProcessing(false);
-      }
-    },
-    [orchestrator, isProcessing, modules, dataManager, prefsManager, showToast, triggerUpdate]
-  );
-
-  const executeBulkAction = useCallback(
-    async (action: 'start' | 'stop' | 'restart', moduleNames: string[]) => {
-      if (isProcessing || moduleNames.length === 0) return;
-
-      try {
-        setIsProcessing(true);
-        setBulkOperationProgress({ total: moduleNames.length, completed: 0, operation: action });
-
-        let completed = 0;
-        const actionVerb =
-          action === 'start' ? 'Starting' : action === 'stop' ? 'Stopping' : 'Restarting';
-
-        for (const moduleName of moduleNames) {
-          try {
-            if (action === 'start') {
-              await orchestrator.start(moduleName);
-            } else if (action === 'stop') {
-              await orchestrator.stop(moduleName);
-            } else if (action === 'restart') {
-              await orchestrator.restart(moduleName);
-            }
-            prefsManager.addToHistory(`${action} ${moduleName}`, moduleName, true);
-            dataManager.markDirty(moduleName);
-            completed++;
-            setBulkOperationProgress({ total: moduleNames.length, completed, operation: action });
-          } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : String(err);
-            showToast(`✗ Failed to ${action} ${moduleName}: ${errorMsg}`, 'error');
-            prefsManager.addToHistory(`${action} ${moduleName}`, moduleName, false);
-          }
-        }
-
-        triggerUpdate();
-        showToast(
-          `✓ ${actionVerb} completed: ${completed}/${moduleNames.length} modules`,
-          'success'
-        );
-
-        setSelectedModules(new Set());
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        showToast(`✗ Bulk operation failed: ${errorMsg}`, 'error');
-      } finally {
-        setIsProcessing(false);
-        setBulkOperationProgress(null);
-      }
-    },
-    [orchestrator, isProcessing, dataManager, prefsManager, showToast, triggerUpdate]
-  );
-
-  const handleModuleAction = useCallback(
-    (action: 'start' | 'stop' | 'restart') => {
-      const module = sortedModules[selectedModule];
-      if (!module || isProcessing) return;
-
-      if (action === 'stop' || action === 'restart') {
-        setConfirmAction({ action, moduleName: module.name });
-      } else {
-        executeModuleAction(action, module.name);
-      }
-    },
-    [sortedModules, selectedModule, isProcessing, executeModuleAction]
-  );
-
-  const handleBulkAction = useCallback(
-    (action: 'start' | 'stop' | 'restart') => {
-      if (selectedModules.size === 0 || isProcessing) return;
-      const moduleNames = Array.from(selectedModules);
-      const bulkAction = `bulk-${action}` as const;
-      setConfirmAction({ action: bulkAction, moduleNames });
-    },
-    [selectedModules, isProcessing]
-  );
-
-  const toggleModuleSelection = useCallback(() => {
-    const module = sortedModules[selectedModule];
-    if (!module) return;
-    setSelectedModules((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(module.name)) {
-        newSet.delete(module.name);
-      } else {
-        newSet.add(module.name);
-      }
-      return newSet;
-    });
-  }, [sortedModules, selectedModule]);
-
-  const selectAllFiltered = useCallback(() => {
-    const allNames = sortedModules.map((m) => m.name);
-    setSelectedModules(new Set(allNames));
-    showToast(`Selected ${allNames.length} modules`, 'info');
-  }, [sortedModules, showToast]);
-
-  const clearSelection = useCallback(() => {
-    setSelectedModules(new Set());
-  }, []);
-
-  const handleExit = useCallback(() => {
-    exit();
-  }, [exit]);
-
-  const handleInput = useCallback(
-    (
-      input: string,
-      key: {
-        upArrow?: boolean;
-        downArrow?: boolean;
-        escape?: boolean;
-        backspace?: boolean;
-        delete?: boolean;
-        ctrl?: boolean;
-        shift?: boolean;
-        return?: boolean;
-      }
-    ) => {
-      if (input === 'q' || input === 'Q') {
-        handleExit();
-        return;
-      }
-
-      if (key.escape) {
-        if (confirmAction) {
-          setConfirmAction(null);
-        } else if (selectedModules.size > 0) {
-          clearSelection();
-          showToast('Selection cleared', 'info');
-        } else if (searchMode) {
-          setSearchMode(false);
-          setSearchQuery('');
-          setSelectedModule(0);
-        } else if (screen === 'dashboard') {
-          handleExit();
-        } else {
-          setScreen('dashboard');
-        }
-        return;
-      }
-
-      if (confirmAction) {
-        if (input === 'y' || input === 'Y') {
-          if (confirmAction.action.startsWith('bulk-')) {
-            const bulkAction = confirmAction.action.replace('bulk-', '') as
-              | 'start'
-              | 'stop'
-              | 'restart';
-            executeBulkAction(bulkAction, confirmAction.moduleNames || []);
-          } else {
-            executeModuleAction(
-              confirmAction.action as 'start' | 'stop' | 'restart',
-              confirmAction.moduleName || ''
-            );
-          }
-          setConfirmAction(null);
-        } else if (input === 'n' || input === 'N') {
-          setConfirmAction(null);
-        }
-        return;
-      }
-
-      if (screen === 'dashboard') {
-        if (searchMode) {
-          if (key.backspace || key.delete) {
-            setSearchQuery(searchQuery.slice(0, -1));
-          } else if (input && input.length === 1 && /[a-zA-Z0-9-_]/.test(input)) {
-            setSearchQuery(searchQuery + input);
-          }
-        } else {
-          if (key.upArrow && selectedModule > 0) {
-            setSelectedModule(selectedModule - 1);
-          } else if (key.downArrow && selectedModule < sortedModules.length - 1) {
-            setSelectedModule(selectedModule + 1);
-          } else if (input === 'k' && selectedModule > 0) {
-            setSelectedModule(selectedModule - 1);
-          } else if (input === 'j' && selectedModule < sortedModules.length - 1) {
-            setSelectedModule(selectedModule + 1);
-          } else if (input === 'g') {
-            if (lastKey === 'g') {
-              setSelectedModule(0);
-              setLastKey(null);
-            } else {
-              setLastKey('g');
-            }
-          } else if (input === 'G') {
-            setSelectedModule(sortedModules.length - 1);
-          } else if (input === '/') {
-            setSearchMode(true);
-            setSearchQuery('');
-          } else if (input === ' ') {
-            toggleModuleSelection();
-          } else if (key.ctrl && input === 'a') {
-            selectAllFiltered();
-          } else if (key.shift && input === 'S') {
-            handleBulkAction('start');
-          } else if (key.shift && input === 'X') {
-            handleBulkAction('stop');
-          } else if (key.shift && input === 'R') {
-            handleBulkAction('restart');
-          } else if (input === '1' || input === 's') {
-            handleModuleAction('start');
-          } else if (input === '2' || input === 'x') {
-            handleModuleAction('stop');
-          } else if (input === '3' || input === 'r') {
-            handleModuleAction('restart');
-          } else if (input === 'f' || input === 'F') {
-            const module = sortedModules[selectedModule];
-            if (module) {
-              if (prefsManager.isFavorite(module.name)) {
-                prefsManager.removeFavorite(module.name);
-                showToast(`☆ Removed ${module.name} from favorites`, 'info');
-              } else {
-                prefsManager.addFavorite(module.name);
-                showToast(`★ Added ${module.name} to favorites`, 'success');
-              }
-              triggerUpdate();
-            }
-          } else if (input === 'm' || input === 'M') {
-            setScreen('modules');
-          } else if (input === 'e' || input === 'E') {
-            setScreen('env');
-          } else if (input === 'l' || input === 'L') {
-            setScreen('logs');
-          } else if (input === 'i' || input === 'I') {
-            setScreen('history');
-          } else if (input === 'h' || input === 'H' || input === '?') {
-            setScreen('help');
-          } else if (input === 't' || input === 'T') {
-            const themeNames = Object.keys(THEMES);
-            const currentIndex = themeNames.indexOf(prefsManager.getTheme());
-            const nextIndex = (currentIndex + 1) % themeNames.length;
-            const nextTheme = themeNames[nextIndex];
-            prefsManager.setTheme(nextTheme!);
-            showToast(`Theme changed to ${THEMES[nextTheme!]!.name}`, 'info');
-            triggerUpdate();
-          } else if (key.return) {
-            setScreen('details');
-          }
-        }
-      } else {
-        if (input === 'b' || input === 'B') {
-          setScreen('dashboard');
-        }
-      }
-    },
-    [
-      screen,
-      searchMode,
-      searchQuery,
-      selectedModule,
-      sortedModules,
-      lastKey,
-      confirmAction,
-      handleModuleAction,
-      handleBulkAction,
-      toggleModuleSelection,
-      selectAllFiltered,
-      clearSelection,
-      selectedModules,
-      handleExit,
-      showToast,
-      prefsManager,
-      executeModuleAction,
-      executeBulkAction,
-      triggerUpdate,
-    ]
-  );
-
-  useInput(handleInput);
 
   const stats = useMemo(() => {
     const runningCount = modules.filter((m) => m.status === 'RUNNING').length;
@@ -591,86 +88,93 @@ const Dashboard: React.FC = () => {
     return { runningCount, stoppedCount, total: modules.length };
   }, [modules]);
 
-  if (loading) {
-    return <SplashScreen theme={theme} />;
+  // Input Hook
+  useDashboardInput({
+    screen,
+    setScreen,
+    searchMode,
+    setSearchMode,
+    searchQuery,
+    setSearchQuery: (q) => {
+      setSearchQuery(q);
+      // Debounce logic is inside SearchModal for the modal input,
+      // but for direct slash command key presses we might need this.
+      // Although slash just opens the modal now.
+      setDebouncedSearchQuery(q);
+    },
+    selectedModule,
+    setSelectedModule,
+    sortedModules,
+    confirmAction,
+    setConfirmAction,
+    selectedModules,
+    setSelectedModules,
+    lastKey,
+    setLastKey,
+    handleExit: () => exit(),
+    data,
+  });
+
+  // Handle Debounce for Search
+  // If we wanted to keep the legacy inline search behavior we'd need the useEffect here,
+  // but we moved to SearchModal.
+  // Render sub-screens via Router
+  const subScreen = (
+    <ScreenRouter
+      screen={screen}
+      loading={loading}
+      error={error}
+      theme={theme}
+      modules={modules}
+      selectedModuleIndex={selectedModule}
+      sortedModules={sortedModules}
+      orchestrator={orchestrator}
+      setScreen={setScreen}
+      handleExit={() => exit()}
+    />
+  );
+
+  if (subScreen) {
+    // ScreenRouter returns null if screen is 'dashboard' (or unknown), so we render dashboard below
+    if (screen !== 'dashboard') return subScreen;
   }
 
-  if (error) {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Box borderStyle="round" borderColor="red" padding={1}>
-          <Text color="red">✗ Error: {error}</Text>
-        </Box>
-        <Box marginTop={1}>
-          <Text dimColor>Press 'q' to exit</Text>
-        </Box>
-      </Box>
-    );
-  }
+  // If loading/error caught by ScreenRouter, they returned early.
+  // But ScreenRouter only returns if it matches a screen.
+  // We need to handle loading/error for 'dashboard' screen too if ScreenRouter didn't catch it.
 
-  if (screen === 'help') {
-    return <HelpScreen onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
-  }
+  if (loading) return subScreen; // ScreenRouter handles loading
+  if (error) return subScreen;   // ScreenRouter handles error
 
-  if (screen === 'env') {
-    return <EnvScreen onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
-  }
-
-  if (screen === 'logs') {
-    return (
-      <LogsScreen
-        modules={modules}
-        selectedModule={selectedModule}
-        onBack={() => setScreen('dashboard')}
-        onQuit={handleExit}
-      />
-    );
-  }
-
-  if (screen === 'history') {
-    return <HistoryScreen onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
-  }
-
-  if (screen === 'details') {
-    const module = sortedModules[selectedModule];
-    const moduleConfig = module ? orchestrator.getModule(module.name) : null;
-
-    if (!module) {
-      return (
-        <Box flexDirection="column" padding={1}>
-          <Box borderStyle="round" borderColor="red" padding={1}>
-            <Text color="red">No module selected</Text>
-          </Box>
-          <Box marginTop={1}>
-            <Text dimColor>Press 'b' to go back</Text>
-          </Box>
-        </Box>
-      );
-    }
-
-    return (
-      <ModuleDetailsScreen
-        module={module}
-        moduleConfig={moduleConfig || null}
-        onBack={() => setScreen('dashboard')}
-        onQuit={handleExit}
-      />
-    );
-  }
-
-  // Modern Dashboard with Sidebar Layout
+  // Main Dashboard Render
   return (
     <Box flexDirection="row" width="100%">
       {/* Sidebar */}
       <Sidebar
+        theme={theme}
         stats={stats}
         selectedScreen={screen}
-        onNavigate={(newScreen) => setScreen(newScreen)}
-        theme={theme}
+        onNavigate={setScreen}
       />
 
-      {/* Main Content Area */}
-      <Box flexDirection="column" flexGrow={1} paddingX={1} paddingY={0}>
+      {searchMode && (
+        <SearchModal
+          theme={theme}
+          initialQuery={searchQuery}
+          onSearch={(query) => {
+             setSearchQuery(query);
+             setDebouncedSearchQuery(query);
+          }}
+          onClose={() => {
+            setSearchMode(false);
+            if (!searchQuery) {
+              setDebouncedSearchQuery('');
+            }
+          }}
+        />
+      )}
+
+      <Box flexDirection="column" flexGrow={1}>
         {/* Modern Header */}
         <ModernHeader
           systemResources={systemResources}
@@ -679,7 +183,7 @@ const Dashboard: React.FC = () => {
           theme={theme}
         />
 
-        {/* Search Bar */}
+        {/* Search Bar Info (Overlay?) */}
         {searchMode && (
           <Box borderStyle="round" borderColor={theme.colors.primary} padding={1} marginBottom={1}>
             <Text>
@@ -814,8 +318,8 @@ const Dashboard: React.FC = () => {
                       {confirmAction.action.replace('bulk-', '')}
                     </Text>{' '}
                     <Text bold color="cyan">
-                      {confirmAction.moduleNames?.length || 0} module
-                      {(confirmAction.moduleNames?.length || 0) > 1 ? 's' : ''}
+                      {confirmAction.moduleNames?.length ?? 0} module
+                      {(confirmAction.moduleNames?.length ?? 0) > 1 ? 's' : ''}
                     </Text>
                     ?
                   </Text>
@@ -866,6 +370,15 @@ const Dashboard: React.FC = () => {
   );
 };
 
+// Top-level ErrorBoundary Wrapper
+const Dashboard: React.FC = () => {
+    return (
+        <ErrorBoundary>
+            <DashboardContent />
+        </ErrorBoundary>
+    );
+};
+
 export async function dashboardCommand(): Promise<void> {
   // Enter alternate screen buffer (like vim/htop)
   process.stdout.write('\x1b[?1049h');
@@ -880,6 +393,10 @@ export async function dashboardCommand(): Promise<void> {
     process.stdout.write('\x1b[?25h');
     // Leave alternate screen buffer
     process.stdout.write('\x1b[?1049l');
+    // Clear any lingering input
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(false);
+    }
   };
 
   // Ensure cleanup on exit signals

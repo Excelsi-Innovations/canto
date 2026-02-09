@@ -39,7 +39,7 @@ export class AutoRestartManager {
   registerFailure(moduleName: string): boolean {
     if (!this.config.enabled) return false;
 
-    const state = this.restartStates.get(moduleName) || {
+    const state = this.restartStates.get(moduleName) ?? {
       moduleName,
       retryCount: 0,
       lastFailure: new Date(),
@@ -76,7 +76,7 @@ export class AutoRestartManager {
     onScheduled?: (delay: number) => void
   ): void {
     const state = this.restartStates.get(moduleName);
-    if (!state || !state.nextRetryAt) return;
+    if (!state?.nextRetryAt) return;
 
     // Clear existing timer
     this.cancelRestart(moduleName);
@@ -114,7 +114,7 @@ export class AutoRestartManager {
       await restartFn();
       // Success - reset state
       this.resetState(moduleName);
-    } catch (error) {
+    } catch (_error) {
       // Failed - register another failure
       state.isRestarting = false;
       this.restartStates.set(moduleName, state);
@@ -144,7 +144,7 @@ export class AutoRestartManager {
    * Get restart state for a module
    */
   getState(moduleName: string): ModuleRestartState | null {
-    return this.restartStates.get(moduleName) || null;
+    return this.restartStates.get(moduleName) ?? null;
   }
 
   /**

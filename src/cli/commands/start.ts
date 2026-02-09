@@ -73,7 +73,9 @@ export async function startCommand(modules: string[], options: StartOptions): Pr
             `${icons.warning} Port allocation failed, continuing without auto-allocation...\n`
           )
         );
-        console.log(colors.dim(`Error: ${error instanceof Error ? error.message : String(error)}\n`));
+        console.log(
+          colors.dim(`Error: ${error instanceof Error ? error.message : String(error)}\n`)
+        );
       }
     }
 

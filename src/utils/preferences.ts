@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -48,16 +48,16 @@ export const THEMES: Record<string, Theme> = {
   default: {
     name: 'Pessoa',
     colors: {
-      primary: '#C4A882', // Warm parchment/sand
-      success: '#7D9E80', // Muted sage green
-      error: '#B85C5C', // Soft burgundy
-      warning: '#D4A957', // Warm gold
-      info: '#8FAABD', // Desaturated steel blue
-      border: '#3A3632', // Warm dark brown
-      headerBorder: '#A68B6B', // Warm bronze
-      background: '#1C1A17', // Deep warm black
-      muted: '#6B6560', // Warm gray
-      highlight: '#3D352E', // Selection warm
+      primary: '#D8B4FE', // Soft Purple
+      success: '#4ADE80', // Bright Green
+      error: '#F87171', // Soft Red
+      warning: '#FBBF24', // Amber
+      info: '#60A5FA', // Blue
+      border: '#4C1D95', // Deep Purple
+      headerBorder: '#A78BFA', // Light Purple
+      background: '#1E1B4B', // Very Dark Purple
+      muted: '#8B5CF6', // Muted Purple
+      highlight: '#5B21B6', // Purple Highlight
     },
   },
   phosphor: {
@@ -166,14 +166,14 @@ export function loadPreferences(): UserPreferences {
       const prefs = JSON.parse(data);
 
       // Convert history timestamps back to Date objects
-      prefs.history = prefs.history.map((h: any) => ({
+      prefs.history = prefs.history.map((h: Record<string, unknown>) => ({
         ...h,
-        timestamp: new Date(h.timestamp),
+        timestamp: new Date(h['timestamp'] as string | number | Date),
       }));
 
       return prefs;
     }
-  } catch (error) {
+  } catch (_error) {
     // Ignore errors, return defaults
   }
 
@@ -194,11 +194,11 @@ export function savePreferences(prefs: UserPreferences): void {
   try {
     const dir = join(homedir(), '.canto');
     if (!existsSync(dir)) {
-      require('fs').mkdirSync(dir, { recursive: true });
+      mkdirSync(dir, { recursive: true });
     }
 
     writeFileSync(PREFS_FILE, JSON.stringify(prefs, null, 2), 'utf-8');
-  } catch (error) {
+  } catch (_error) {
     // Silently fail
   }
 }
@@ -294,7 +294,7 @@ export function setTheme(themeName: string): void {
  */
 export function getTheme(): Theme {
   const prefs = loadPreferences();
-  return THEMES[prefs.theme] ?? THEMES['default']!;
+  return THEMES[prefs.theme] ?? THEMES['default'] ?? ({} as Theme);
 }
 
 /**

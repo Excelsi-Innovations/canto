@@ -65,7 +65,7 @@ function colorizeLogLine(line: string, index: number): React.ReactNode {
   const timestampMatch = line.match(
     /^(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?|\d{2}:\d{2}:\d{2}(?:\.\d+)?)/
   );
-  if (timestampMatch && timestampMatch[1]) {
+  if (timestampMatch?.[1]) {
     const timestamp = timestampMatch[1];
     const rest = line.substring(timestamp.length);
     return (
@@ -150,7 +150,7 @@ export const LogsScreen: React.FC<LogsScreenProps> = React.memo(
               <Text dimColor>
                 Module:{' '}
                 <Text bold color="cyan">
-                  {currentModule?.name || 'None'}
+                  {currentModule?.name ?? 'None'}
                 </Text>
                 <Text dimColor>
                   {' '}
