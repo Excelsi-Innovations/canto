@@ -120,6 +120,9 @@ const DashboardContent: React.FC = () => {
     }, 150);
     return () => clearTimeout(handler);
   }, [searchQuery]);
+  // Render sub-screens (help, env, logs, history, details)
+  // ScreenRouter returns null for 'dashboard' and 'modules' screens,
+  // which are rendered directly in this component below
   const subScreen = (
     <ScreenRouter
       screen={screen}
@@ -184,7 +187,8 @@ const DashboardContent: React.FC = () => {
 
       {/* Main Content Area */}
       <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-         {screen !== 'dashboard' ? subScreen : (
+         {/* Show subScreen for non-dashboard/modules screens, otherwise show dashboard content */}
+         {screen !== 'dashboard' && screen !== 'modules' ? subScreen : (
            <>
         {/* Modern Header */}
         <ModernHeader
@@ -219,32 +223,43 @@ const DashboardContent: React.FC = () => {
           overflow="hidden"
           minWidth={0}
         >
-          <Box marginBottom={1}>
-            <Text bold color={theme.colors.warning}>
-              📦 {sortedModules.length} Module{sortedModules.length !== 1 ? 's' : ''}
-              {selectedModules.size > 0 && (
-                <Text color={theme.colors.info}> • {selectedModules.size} selected</Text>
-              )}
-            </Text>
-          </Box>
-
-          {sortedModules.length === 0 ? (
-            <Text dimColor>No modules match "{searchQuery}"</Text>
-          ) : (
-            <Box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden" minWidth={0}>
-              {sortedModules.map((module, index) => (
-                <ModuleRow
-                  key={module.name}
-                  module={module}
-                  isSelected={index === selectedModule}
-                  searchQuery={searchQuery}
-                  isFavorite={prefsManager.isFavorite(module.name)}
-                  isChecked={selectedModules.has(module.name)}
-                  autoRestartState={autoRestartManager.getState(module.name)}
-                  theme={theme}
-                />
-              ))}
+          {loading ? (
+            <Box flexGrow={1} justifyContent="center" alignItems="center">
+              <Text>Loading modules...</Text>
             </Box>
+          ) : (
+            <>
+              <Box marginBottom={1}>
+                <Text bold color={theme.colors.warning}>
+                  📦 {sortedModules.length} Module{sortedModules.length !== 1 ? 's' : ''}
+                  {selectedModules.size > 0 && (
+                    <Text color={theme.colors.info}> • {selectedModules.size} selected</Text>
+                  )}
+                </Text>
+              </Box>
+
+              {sortedModules.length === 0 ? (
+                <Box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column">
+                  <Text dimColor>No modules match "{searchQuery}"</Text>
+                  <Text dimColor>Check your dev.config.yaml or clear search.</Text>
+                </Box>
+              ) : (
+                <Box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden" minWidth={0}>
+                  {sortedModules.map((module, index) => (
+                    <ModuleRow
+                      key={module.name}
+                      module={module}
+                      isSelected={index === selectedModule}
+                      searchQuery={searchQuery}
+                      isFavorite={prefsManager.isFavorite(module.name)}
+                      isChecked={selectedModules.has(module.name)}
+                      autoRestartState={autoRestartManager.getState(module.name)}
+                      theme={theme}
+                    />
+                  ))}
+                </Box>
+              )}
+            </>
           )}
         </Box>
 

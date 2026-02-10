@@ -105,5 +105,21 @@ export const ScreenRouter: React.FC<ScreenRouterProps> = ({
     );
   }
 
-  return null;
+  // For 'dashboard' and 'modules' screens, return null
+  // These are rendered directly in dashboard.tsx
+  if (screen === 'dashboard' || screen === 'modules') {
+    return null;
+  }
+
+  // Unknown screen - show error
+  return (
+    <Box flexDirection="column" padding={1}>
+      <Box borderStyle="round" borderColor="red" padding={1}>
+        <Text color="red">Unknown screen: {screen}</Text>
+      </Box>
+      <Box marginTop={1}>
+        <Text dimColor>Press 'b' to go back</Text>
+      </Box>
+    </Box>
+  );
 };

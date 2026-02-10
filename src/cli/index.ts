@@ -102,14 +102,25 @@ program
 program
   .command('dashboard')
   .alias('dash')
-  .description('Launch interactive dashboard (OS-style interface)')
+  .description('Launch interactive dashboard')
   .action(dashboardCommand);
 
 program.command('update').description('Update Canto to the latest version').action(updateCommand);
 
-// Default action - show interactive dashboard
+// Default action - check for config, run init wizard if needed, otherwise show dashboard
 program.action(async () => {
-  await dashboardCommand();
+  const { existsSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const configPath = join(process.cwd(), 'dev.config.yaml');
+  
+  if (!existsSync(configPath)) {
+    // No config found, run init wizard
+    console.log(pc.yellow('\n⚠️  No configuration found. Running init wizard...\n'));
+    await initCommand({ force: false, yes: false });
+  } else {
+    // Config exists, run dashboard
+    await dashboardCommand();
+  }
 });
 
 program.parse();
