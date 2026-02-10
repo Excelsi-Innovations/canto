@@ -4,7 +4,7 @@ import { render } from 'ink';
 import React from 'react';
 import { detectProject } from '../../init/detector.js';
 import { generateConfig, configToYaml } from '../../init/templates.js';
-import { InitWizard } from '../../init/wizard.js';
+import { CantoComposer } from '../../init/composer.js';
 import { icons, colors } from '../utils/display.js';
 import { errorBox, successBox } from '../utils/format.js';
 
@@ -88,7 +88,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
     // Launch interactive wizard
     const { waitUntilExit } = render(
-      React.createElement(InitWizard, {
+      React.createElement(CantoComposer, {
         detection,
         onComplete: (wizardOptions) => {
           const config = generateConfig({
@@ -112,11 +112,15 @@ export async function initCommand(options: InitOptions): Promise<void> {
               `Created: dev.config.yaml\n\n` +
                 `${colors.bold('Modules configured:')}\n` +
                 `  • ${config.modules.length} module(s)\n\n` +
-                `${colors.bold('Next steps:')}\n` +
-                `  ${icons.check} Review: cat dev.config.yaml\n` +
-                `  ${icons.rocket} Start: canto start --all`
+                `${colors.bold('Launching dashboard...')}`
             )}\n`
           );
+
+          // Auto-launch dashboard after successful init
+          setTimeout(async () => {
+            const { dashboardCommand } = await import('./dashboard.js');
+            await dashboardCommand();
+          }, 500);
         },
         onCancel: () => {
           console.log(`\n${colors.yellow(`${icons.info} Initialization cancelled`)}\n`);

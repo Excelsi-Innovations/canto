@@ -52,6 +52,8 @@ export const ComposerLayout: React.FC<ComposerLayoutProps> = ({
              <Text> Confirm </Text>
              <Text backgroundColor={theme.colors.error} color="white" bold> N </Text>
              <Text> Cancel </Text>
+             <Text backgroundColor={theme.colors.info} color="black" bold> B </Text>
+             <Text> Back </Text>
              <Text backgroundColor={theme.colors.muted} color="white" bold> ESC </Text>
              <Text> Exit</Text>
            </Text>
@@ -61,6 +63,8 @@ export const ComposerLayout: React.FC<ComposerLayoutProps> = ({
               <Text> Continue </Text>
               <Text backgroundColor={theme.colors.warning} color="black" bold> N </Text>
               <Text> No </Text>
+              <Text backgroundColor={theme.colors.info} color="black" bold> B </Text>
+              <Text> Back </Text>
               <Text backgroundColor={theme.colors.muted} color="white" bold> ESC </Text>
               <Text> Cancel</Text>
             </Text>
