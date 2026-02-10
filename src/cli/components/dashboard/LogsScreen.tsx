@@ -142,7 +142,7 @@ export const LogsScreen: React.FC<LogsScreenProps> = React.memo(
     return (
       <Box flexDirection="column" padding={1}>
         <Box borderStyle="double" borderColor="yellow" padding={1} marginBottom={1}>
-          <Box flexDirection="column" width="100%">
+          <Box flexDirection="column" flexGrow={1} flexShrink={1}>
             <Text bold color="yellow">
               📋 LOGS VIEWER
             </Text>

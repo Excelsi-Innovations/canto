@@ -1,5 +1,8 @@
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
 import { platform } from 'os';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 /**
  * Process resource usage information
@@ -28,24 +31,24 @@ export interface SystemResources {
  * @param pid - Process ID
  * @returns Process resource usage or null if not found
  */
-export function getProcessResources(pid: number): ProcessResources | null {
+export async function getProcessResources(pid: number): Promise<ProcessResources | null> {
   try {
     const os = platform();
 
     if (os === 'win32') {
       // Windows: Use WMIC or PowerShell
-      const output = execSync(
+      const { stdout: output } = await execAsync(
         `powershell "Get-Process -Id ${pid} | Select-Object CPU,WorkingSet | ConvertTo-Json"`,
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
+        { encoding: 'utf-8' }
       );
 
       const data = JSON.parse(output);
       const memoryMB = data.WorkingSet / (1024 * 1024);
 
       // Get total memory for percentage calculation
-      const totalMemOutput = execSync(
+      const { stdout: totalMemOutput } = await execAsync(
         'powershell "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory"',
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
+        { encoding: 'utf-8' }
       );
       const totalMemory = parseInt(totalMemOutput.trim()) / (1024 * 1024);
       const memoryPercent = (memoryMB / totalMemory) * 100;
@@ -58,9 +61,8 @@ export function getProcessResources(pid: number): ProcessResources | null {
       };
     } else {
       // Unix/Linux/macOS: Use ps
-      const output = execSync(`ps -p ${pid} -o %cpu,%mem,rss`, {
+      const { stdout: output } = await execAsync(`ps -p ${pid} -o %cpu,%mem,rss`, {
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'ignore'],
       });
 
       const lines = output.trim().split('\n');
@@ -94,15 +96,15 @@ export function getProcessResources(pid: number): ProcessResources | null {
  *
  * @returns System resource usage
  */
-export function getSystemResources(): SystemResources {
+export async function getSystemResources(): Promise<SystemResources> {
   try {
     const os = platform();
 
     if (os === 'win32') {
       // Windows
-      const memOutput = execSync(
+      const { stdout: memOutput } = await execAsync(
         'powershell "$os = Get-CimInstance Win32_OperatingSystem; @{Total=$os.TotalVisibleMemorySize; Free=$os.FreePhysicalMemory} | ConvertTo-Json"',
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
+        { encoding: 'utf-8' }
       );
 
       const memData = JSON.parse(memOutput);
@@ -111,16 +113,16 @@ export function getSystemResources(): SystemResources {
       const usedMemory = totalMemory - freeMemory;
 
       // Get CPU count
-      const cpuOutput = execSync(
+      const { stdout: cpuOutput } = await execAsync(
         'powershell "(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors"',
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
+        { encoding: 'utf-8' }
       );
       const cpuCount = parseInt(cpuOutput.trim());
 
       // Get CPU usage (approximate)
-      const cpuUsageOutput = execSync(
+      const { stdout: cpuUsageOutput } = await execAsync(
         'powershell "(Get-Counter \'\\Processor(_Total)\\% Processor Time\').CounterSamples[0].CookedValue"',
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
+        { encoding: 'utf-8' }
       );
       const cpuUsage = parseFloat(cpuUsageOutput.trim());
 
@@ -133,7 +135,7 @@ export function getSystemResources(): SystemResources {
       };
     } else if (os === 'darwin') {
       // macOS
-      const vmOutput = execSync('vm_stat', { encoding: 'utf-8' });
+      const { stdout: vmOutput } = await execAsync('vm_stat', { encoding: 'utf-8' });
       const pageSize = 4096; // bytes
 
       const getPages = (line: string | undefined) => {
@@ -148,16 +150,18 @@ export function getSystemResources(): SystemResources {
       const inactivePages = getPages(lines.find((l) => l.includes('Pages inactive')));
       const wiredPages = getPages(lines.find((l) => l.includes('Pages wired down')));
 
-      const totalMemory =
-        (execSync('sysctl hw.memsize', { encoding: 'utf-8' }).match(/\d+/) ?? ['0'])[0] ?? '0';
+      const { stdout: totalMemOutput } = await execAsync('sysctl hw.memsize', { encoding: 'utf-8' });
+      
+      const totalMemory = (totalMemOutput.match(/\d+/) ?? ['0'])[0] ?? '0';
       const total = parseInt(totalMemory) / (1024 * 1024);
       const freeMemory = (freePages * pageSize) / (1024 * 1024);
       const usedMemory = ((activePages + inactivePages + wiredPages) * pageSize) / (1024 * 1024);
 
-      const cpuCount = parseInt(execSync('sysctl -n hw.ncpu', { encoding: 'utf-8' }).trim() || '1');
+      const { stdout: cpuCountOutput } = await execAsync('sysctl -n hw.ncpu', { encoding: 'utf-8' });
+      const cpuCount = parseInt(cpuCountOutput.trim() || '1');
 
       // Get CPU usage via top
-      const topOutput = execSync('top -l 1 -n 0 | grep "CPU usage"', { encoding: 'utf-8' });
+      const { stdout: topOutput } = await execAsync('top -l 1 -n 0 | grep "CPU usage"', { encoding: 'utf-8' });
       const cpuMatch = topOutput.match(/(\d+\.\d+)% user/);
       const cpuUsage = cpuMatch?.[1] ? parseFloat(cpuMatch[1]) : 0;
 
@@ -170,7 +174,7 @@ export function getSystemResources(): SystemResources {
       };
     } else {
       // Linux
-      const meminfo = execSync('cat /proc/meminfo', { encoding: 'utf-8' });
+      const { stdout: meminfo } = await execAsync('cat /proc/meminfo', { encoding: 'utf-8' });
       const getMemValue = (key: string): number => {
         const match = meminfo.match(new RegExp(`${key}:\\s+(\\d+)`));
         return match?.[1] ? parseInt(match[1]) / 1024 : 0; // Convert KB to MB
@@ -180,10 +184,11 @@ export function getSystemResources(): SystemResources {
       const freeMemory = getMemValue('MemFree') + getMemValue('Buffers') + getMemValue('Cached');
       const usedMemory = totalMemory - freeMemory;
 
-      const cpuCount = parseInt(execSync('nproc', { encoding: 'utf-8' }).trim());
+      const { stdout: cpuCountOutput } = await execAsync('nproc', { encoding: 'utf-8' });
+      const cpuCount = parseInt(cpuCountOutput.trim());
 
       // Get CPU usage from /proc/stat
-      const stat = execSync('cat /proc/stat | grep "^cpu "', { encoding: 'utf-8' });
+      const { stdout: stat } = await execAsync('cat /proc/stat | grep "^cpu "', { encoding: 'utf-8' });
       const values = stat.trim().split(/\s+/).slice(1).map(Number);
       const idle = values[3] ?? 0;
       const total = values.reduce((a, b) => a + b, 0);

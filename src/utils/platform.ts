@@ -113,3 +113,37 @@ export function isWSL(): boolean {
     return false;
   }
 }
+
+/**
+ * Get the terminal type
+ */
+export function getTerminalType(): string {
+  return process.env['TERM'] || 'unknown';
+}
+
+/**
+ * Checks if terminal supports 256 colors
+ */
+export function supports256Colors(): boolean {
+  const term = process.env['TERM'] || '';
+  return term.includes('256color') || term.includes('24bit') || term.includes('truecolor');
+}
+
+/**
+ * Gets platform-specific rendering hints for terminal UI
+ */
+export interface RenderingHints {
+  isWSL: boolean;
+  terminalType: string;
+  supports256Colors: boolean;
+  platform: Platform;
+}
+
+export function getRenderingHints(): RenderingHints {
+  return {
+    isWSL: isWSL(),
+    terminalType: getTerminalType(),
+    supports256Colors: supports256Colors(),
+    platform: detectPlatform(),
+  };
+}

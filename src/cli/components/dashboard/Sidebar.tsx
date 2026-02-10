@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import type { Screen } from '../../types.js';
 import type { Theme } from '../../../utils/preferences.js';
-import { SIDEBAR_LOGO, getCurrentQuote } from '../../lib/branding.js';
+import { getCurrentQuote } from '../../lib/branding.js';
 
 interface SidebarProps {
   stats: {
@@ -15,7 +15,7 @@ interface SidebarProps {
   theme: Theme;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ stats, selectedScreen, theme }) => {
+export const Sidebar: React.FC<SidebarProps> = React.memo(({ stats, selectedScreen, theme }) => {
   const [quote, setQuote] = useState(getCurrentQuote());
 
   useEffect(() => {
@@ -28,26 +28,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ stats, selectedScreen, theme }
   return (
     <Box
       flexDirection="column"
-      width={32}
+      flexBasis={32}
+      flexShrink={0}
       borderStyle="round"
       borderColor={theme.colors.border}
       paddingX={1}
       paddingY={0}
-      marginRight={1}
       height="100%"
+      overflow="hidden"
     >
       {/* Compact Canto Logo - Centered */}
-      <Box 
-        marginTop={0} 
-        marginBottom={1} 
-        flexDirection="column" 
-        width="100%"
+      <Box
+        justifyContent="center"
+        alignItems="center"
+        marginBottom={1}
+        flexGrow={0}
+        flexShrink={0}
       >
-        {SIDEBAR_LOGO.map((line, i) => (
-          <Text key={i} bold color={theme.colors.headerBorder}>
-            {line} 
-          </Text>
-        ))}
         <Box marginTop={1} alignItems="center" justifyContent="center">
            <Text dimColor color={theme.colors.muted}>
             The Dev Maestro
@@ -109,7 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ stats, selectedScreen, theme }
             theme={theme} 
         />
         <NavItem 
-            label="Environment" 
+            label="Environment " 
             icon="⚙️" 
             hotkey="E" 
             isActive={selectedScreen === 'env'} 
@@ -145,14 +142,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ stats, selectedScreen, theme }
       </Box>
 
       {/* Rotating Pessoa Quote */}
-      <Box marginTop={1} marginBottom={0} flexDirection="column" alignItems="center">
+      <Box marginTop={1} marginBottom={0} flexDirection="column" alignItems="center" height={3}>
           <Text italic dimColor color={theme.colors.primary} wrap="wrap">
             {quote}
           </Text>
       </Box>
     </Box>
   );
-};
+});
 
 const NavItem: React.FC<{
     label: string;

@@ -2,8 +2,14 @@ import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { ModuleStatus } from '../../types.js';
 import { formatMemory, createBar } from '../../../utils/resources.js';
-import { checkResourceAlerts, getAlertIcon, getAlertColor } from '../../lib/resource-alerts.js';
+import { getAlertIcon, getAlertColor } from '../../lib/resource-alerts.js';
 import type { ModuleRestartState } from '../../lib/auto-restart-manager.js';
+import { 
+  getStatusConfig, 
+  getAutoRestartInfo, 
+  getModuleAlert 
+} from './ModuleStatusUtils.js';
+import type { Theme } from '../../../utils/preferences.js';
 
 interface ModuleRowProps {
   module: ModuleStatus;
@@ -12,6 +18,10 @@ interface ModuleRowProps {
   isFavorite?: boolean;
   autoRestartState?: ModuleRestartState | null;
   isChecked?: boolean;
+  // Added theme prop to match utils requirement, assuming we can update usage or make utils flexible.
+  // If ModuleRow is used where theme is not available, we might need a default theme or make it optional.
+  // For now, let's look at where it is used.
+  theme: Theme; 
 }
 
 /**
@@ -55,64 +65,60 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
     isFavorite = false,
     autoRestartState = null,
     isChecked = false,
+    theme,
   }) => {
-    // Enhanced status badges with colors
-    const statusConfig = {
-      RUNNING: { icon: '●', color: 'green' as const },
-      STOPPED: { icon: '○', color: 'gray' as const },
-      STARTING: { icon: '◐', color: 'yellow' as const },
-      STOPPING: { icon: '◑', color: 'yellow' as const },
-      ERROR: { icon: '✗', color: 'red' as const },
-    };
-
-    const status = statusConfig[module.status as keyof typeof statusConfig] ?? {
-      icon: '?',
-      color: 'gray' as const,
-    };
+    // Enhanced status badges with colors using shared util
+    const status = getStatusConfig(module.status, theme);
+    
     const favoriteIcon = isFavorite ? '★' : '☆';
     const checkboxIcon = isChecked ? '☑' : '☐';
     const highlightedName = useHighlightedText(module.name, searchQuery ?? '');
 
-    // Check for resource alerts
-    const alerts = checkResourceAlerts(module);
-    const criticalAlert = alerts.find((a) => a.level === 'critical');
-    const warningAlert = alerts.find((a) => a.level === 'warning');
-    const alert = criticalAlert ?? warningAlert;
+    // Check for resource alerts using shared util
+    const alert = getModuleAlert(module);
 
-    // Format auto-restart info
-    const autoRestartInfo = useMemo(() => {
-      if (!autoRestartState?.nextRetryAt) return null;
-
-      const now = Date.now();
-      const nextRetry = autoRestartState.nextRetryAt.getTime();
-      const secondsRemaining = Math.max(0, Math.ceil((nextRetry - now) / 1000));
-
-      return {
-        retryCount: autoRestartState.retryCount,
-        secondsRemaining,
-        isRestarting: autoRestartState.isRestarting,
-      };
-    }, [autoRestartState]);
+    // Format auto-restart info using shared util
+    const autoRestartInfo = useMemo(() => getAutoRestartInfo(autoRestartState), [autoRestartState]);
 
     return (
-      <Box marginBottom={1} flexDirection="column">
-        <Box width="100%">
-          <Text
+      <Box marginBottom={1} flexDirection="column" overflow="hidden" minWidth={0}>
+        <Box flexDirection="row" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
+          {/* Checkbox & Status & Name */}
+          <Box 
+            flexGrow={1}
+            flexShrink={1}
+            minWidth={0} 
+            overflow="hidden"
             backgroundColor={isSelected ? 'blue' : undefined}
-            color={isSelected ? 'white' : undefined}
           >
-            {isSelected ? '❯' : ' '} <Text color={isChecked ? 'cyan' : 'gray'}>{checkboxIcon}</Text>{' '}
-            <Text color={isFavorite ? 'yellow' : 'gray'}>{favoriteIcon}</Text>{' '}
-            <Text color={status.color}>{status.icon}</Text> {highlightedName}
-            {' '.repeat(Math.max(1, 18 - module.name.length))}
-            <Text>{module.type.padEnd(10)}</Text>
-            {alert && <Text color={getAlertColor(alert.level)}> {getAlertIcon(alert.level)}</Text>}
-            {autoRestartInfo && !autoRestartInfo.isRestarting && (
-              <Text color="cyan"> 🔄{autoRestartInfo.secondsRemaining}s</Text>
-            )}
-            {autoRestartInfo?.isRestarting && <Text color="yellow"> ⟳</Text>}
-          </Text>
-          {module.pid && (
+             <Text
+                color={isSelected ? 'white' : undefined}
+                wrap="truncate-end"
+              >
+                {isSelected ? '❯' : ' '} <Text color={isChecked ? 'cyan' : 'gray'}>{checkboxIcon}</Text>{' '}
+                <Text color={isFavorite ? 'yellow' : 'gray'}>{favoriteIcon}</Text>{' '}
+                <Text color={status.color}>{status.icon}</Text> {highlightedName}
+              </Text>
+          </Box>
+
+          {/* Type - flexible width */}
+          <Box flexBasis={12} flexShrink={0} marginLeft={1} overflow="hidden">
+             <Text wrap="truncate-end">{module.type}</Text>
+          </Box>
+
+          {/* Badges/Alerts - flexible width */}
+          <Box flexBasis={18} flexShrink={0} justifyContent="flex-end" overflow="hidden">
+              {alert && <Text color={getAlertColor(alert.level)}> {getAlertIcon(alert.level)}</Text>}
+              {autoRestartInfo && !autoRestartInfo.isRestarting && (
+                <Text color="cyan"> 🔄{autoRestartInfo.secondsRemaining}s</Text>
+              )}
+              {autoRestartInfo?.isRestarting && <Text color="yellow"> ⟳</Text>}
+          </Box>
+        </Box>
+        
+        {/* Resource Row */}
+        <Box marginLeft={2}>
+            {module.pid && (
             <>
               <Text dimColor> PID {module.pid}</Text>
               {module.cpu !== undefined && <Text dimColor> • CPU {module.cpu.toFixed(1)}%</Text>}
@@ -175,7 +181,9 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.searchQuery === nextProps.searchQuery &&
       prevProps.isFavorite === nextProps.isFavorite &&
-      prevProps.isChecked === nextProps.isChecked;
+      prevProps.isChecked === nextProps.isChecked &&
+      // Check for theme equality if we add it to props
+      prevProps.theme === nextProps.theme; 
 
     // For objects, do deep comparison only if needed
     if (!areEqual) return false;
@@ -205,3 +213,4 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
 );
 
 ModuleRow.displayName = 'ModuleRow';
+

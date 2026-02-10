@@ -52,9 +52,7 @@ export const SIDEBAR_LOGO = MINI_MONOLITH;
 export const PESSOA_QUOTES = [
   '"I am many, and yet I am one." — Fernando Pessoa',
   '"To be great, be whole." — Fernando Pessoa',
-  '"I am nothing. I shall never be anything." — Pessoa',
   '"Literature is the proof that life is not enough." — Pessoa',
-  '"I carry my awareness of defeat like a flag of victory." — Pessoa',
   '"Everything is worth it if the soul is not small." — Pessoa',
   '"I am the interval between what I wish and what I am." — Pessoa',
 ];

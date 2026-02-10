@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { execSync } from 'child_process';
+// import { execSync } from 'child_process';
 import path from 'path';
 import { ProcessManager } from '../../processes/manager.js';
 import { ModuleOrchestrator } from '../../modules/index.js';
@@ -54,13 +54,19 @@ export function useDashboardData() {
   const shownAutoRestartAlerts = useRef<Set<string>>(new Set());
 
   // Static Info
-  const [gitBranch] = useState<string>(() => {
-    try {
-      return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
-    } catch {
-      return '';
-    }
-  });
+  // Static Info
+  const [gitBranch, setGitBranch] = useState<string>('');
+  
+  useEffect(() => {
+    import('child_process').then(({ exec }) => {
+      exec('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }, (err, stdout) => {
+        if (!err && stdout) {
+          setGitBranch(stdout.trim());
+        }
+      });
+    });
+  }, []);
+
   const cwdName = useMemo(() => path.basename(process.cwd()), []);
   const nodeVersion = process.version;
 
@@ -103,13 +109,12 @@ export function useDashboardData() {
   useEffect(() => {
     const initializeData = async () => {
       try {
-        const [result] = await Promise.allSettled([
-          dataManager.initialize(),
-          new Promise((resolve) => setTimeout(resolve, 2500)),
+        // Ensure splash screen shows for at least 1.5s to prevent flickering
+        // and allow user to see the branding/loading state.
+        await Promise.all([
+            dataManager.initialize(),
+            new Promise((resolve) => setTimeout(resolve, 1500))
         ]);
-        if (result.status === 'rejected') {
-          throw result.reason;
-        }
         setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -301,7 +306,7 @@ export function useDashboardData() {
     [orchestrator, isProcessing, dataManager, prefsManager, showToast, triggerUpdate]
   );
 
-  return {
+  return useMemo(() => ({
     modules,
     setModules,
     loading,
@@ -324,5 +329,27 @@ export function useDashboardData() {
     triggerUpdate,
     executeModuleAction,
     executeBulkAction,
-  };
+  }), [
+    modules,
+    loading,
+    error,
+    isProcessing,
+    systemResources,
+    toasts,
+    showToast,
+    bulkOperationProgress,
+    processManager,
+    orchestrator,
+    dataManager,
+    prefsManager,
+    resourceHistory,
+    autoRestartManager,
+    gitBranch,
+    cwdName,
+    nodeVersion,
+    theme,
+    triggerUpdate,
+    executeModuleAction,
+    executeBulkAction,
+  ]);
 }

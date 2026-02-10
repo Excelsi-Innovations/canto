@@ -23,7 +23,7 @@ function compactMemory(mb: number): string {
   return `${(mb / 1024).toFixed(1)}G`;
 }
 
-export const ModernHeader: React.FC<ModernHeaderProps> = ({
+export const ModernHeader: React.FC<ModernHeaderProps> = React.memo(({
   systemResources,
   resourceHistory,
   isProcessing,
@@ -47,6 +47,8 @@ export const ModernHeader: React.FC<ModernHeaderProps> = ({
       paddingY={1}
       marginBottom={1}
       flexDirection="column"
+      overflow="hidden"
+      minWidth={0}
     >
       {/* Title Row: Centered gradient blocks + CANTO + version */}
       <Box justifyContent="center" marginBottom={0}>
@@ -81,46 +83,50 @@ export const ModernHeader: React.FC<ModernHeaderProps> = ({
       />
 
       {/* System Stats Row 1: CPU */}
-      <Box marginBottom={0}>
-        <Box width={5}>
+      <Box marginBottom={0} flexDirection="row">
+        <Box flexBasis={6} flexShrink={0}>
           <Text bold color={theme.colors.warning}>
             CPU
           </Text>
         </Box>
         <Text color={theme.colors.muted}>│ </Text>
-        <Box width={22}>
+        <Box flexBasis={22} flexShrink={0}>
           <Text color={theme.colors.info}>{cpuBar}</Text>
         </Box>
         <Text> </Text>
-        <Box width={8}>
+        <Box flexBasis={8} flexShrink={0}>
           <Text color={theme.colors.primary}>{formatCPU(systemResources.cpuUsage)}</Text>
         </Box>
         <Text color={theme.colors.muted}> │ </Text>
-        <Text color={theme.colors.muted}>{cpuBraille}</Text>
+        <Box flexGrow={1} minWidth={0} overflow="hidden">
+           <Text color={theme.colors.muted} wrap="truncate-end">{cpuBraille}</Text>
+        </Box>
       </Box>
 
       {/* System Stats Row 2: RAM */}
-      <Box>
-        <Box width={5}>
+      <Box flexDirection="row">
+        <Box flexBasis={6} flexShrink={0}>
           <Text bold color={theme.colors.warning}>
             RAM
           </Text>
         </Box>
         <Text color={theme.colors.muted}>│ </Text>
-        <Box width={22}>
+        <Box flexBasis={22} flexShrink={0}>
           <Text color={theme.colors.success}>{memoryBar}</Text>
         </Box>
         <Text> </Text>
-        <Box width={8}>
+        <Box flexBasis={8} flexShrink={0}>
           <Text color={theme.colors.primary}>{memPercent}</Text>
         </Box>
         <Text color={theme.colors.muted}> │ </Text>
-        <Text color={theme.colors.muted}>{memoryBraille}</Text>
-        <Text dimColor color={theme.colors.muted}>
-          {' '}
-          {memLabel}
-        </Text>
+        <Box flexGrow={1} flexDirection="row" overflow="hidden" minWidth={0}>
+           <Text color={theme.colors.muted} wrap="truncate-end">{memoryBraille}</Text>
+           <Text dimColor color={theme.colors.muted} wrap="truncate-end">
+             {' '}
+             {memLabel}
+           </Text>
+        </Box>
       </Box>
     </Box>
   );
-};
+});

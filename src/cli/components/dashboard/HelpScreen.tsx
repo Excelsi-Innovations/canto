@@ -12,14 +12,14 @@ export const HelpScreen: React.FC<ScreenProps> = React.memo(({ onBack, onQuit })
   });
 
   return (
-    <Box flexDirection="column" padding={1}>
-      <Box borderStyle="double" borderColor="cyan" padding={1} marginBottom={1}>
+    <Box flexDirection="column" flexGrow={1} padding={1} overflow="hidden" minWidth={0}>
+      <Box borderStyle="double" borderColor="cyan" padding={1} marginBottom={1} overflow="hidden" minWidth={0}>
         <Text bold color="cyan">
           📖 CANTO HELP
         </Text>
       </Box>
 
-      <Box borderStyle="round" borderColor="gray" padding={1} flexDirection="column">
+      <Box borderStyle="round" borderColor="gray" padding={1} flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden" minWidth={0}>
         <Text bold color="yellow">
           Navigation
         </Text>

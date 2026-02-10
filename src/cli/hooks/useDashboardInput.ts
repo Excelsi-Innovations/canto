@@ -26,6 +26,8 @@ interface UseDashboardInputProps {
   setLastKey: (key: string | null) => void;
   handleExit: () => void;
   data: ReturnType<typeof useDashboardData>;
+  showQuitConfirm: boolean;
+  setShowQuitConfirm: (show: boolean) => void;
 }
 
 export function useDashboardInput({
@@ -33,6 +35,7 @@ export function useDashboardInput({
   setScreen,
   searchMode,
   setSearchMode,
+  searchQuery,
   setSearchQuery,
   selectedModule,
   setSelectedModule,
@@ -45,6 +48,8 @@ export function useDashboardInput({
   setLastKey,
   handleExit,
   data,
+  showQuitConfirm,
+  setShowQuitConfirm,
 }: UseDashboardInputProps) {
   const {
     showToast,
@@ -119,7 +124,23 @@ export function useDashboardInput({
     ) => {
       // Global Quit
       if (input === 'q' || input === 'Q') {
-        handleExit();
+        if (showQuitConfirm) {
+           // If already showing confirm, 'q' does nothing? Or maybe cancels?
+           // Let's keep it simple: 'q' triggers confirm.
+           return;
+        }
+        setShowQuitConfirm(true);
+        return;
+      }
+      
+      // Quit Confirmation Handling
+      if (showQuitConfirm) {
+        if (input === 'y' || input === 'Y' || key.return) {
+           handleExit();
+        } else if (input === 'n' || input === 'N' || key.escape) {
+           setShowQuitConfirm(false);
+        }
+        // Block other inputs
         return;
       }
 
@@ -135,7 +156,8 @@ export function useDashboardInput({
           setSearchQuery('');
           setSelectedModule(0);
         } else if (screen === 'dashboard') {
-          handleExit();
+          // Instead of immediate exit, show confirm
+          setShowQuitConfirm(true);
         } else {
           setScreen('dashboard');
         }
@@ -171,6 +193,18 @@ export function useDashboardInput({
       // Dashboard Logic
       if (screen === 'dashboard') {
         if (searchMode) {
+          if (key.return) {
+            setSearchMode(false);
+            return;
+          }
+          if (key.backspace || key.delete) {
+            setSearchQuery(searchQuery.slice(0, -1));
+            return;
+          }
+          // Accept any printable character (length 1) that isn't a special key
+          if (input && input.length === 1 && !key.ctrl) {
+            setSearchQuery(searchQuery + input);
+          }
           return;
         }
 

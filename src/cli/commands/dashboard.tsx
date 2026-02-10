@@ -1,14 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { render, Box, Text, useApp } from 'ink';
 import Fuse, { type FuseResult } from 'fuse.js';
 import type { ModuleStatus, Screen } from '../types.js';
-import { ModuleCard } from '../components/dashboard/ModuleCard.js';
+import { ModuleRow } from '../components/dashboard/ModuleRow.js';
 import { Sidebar } from '../components/dashboard/Sidebar.js';
 import { ModernHeader } from '../components/dashboard/ModernHeader.js';
 import { Toast } from '../components/dashboard/Toast.js';
-import { SearchModal } from '../components/dashboard/SearchModal.js';
 import { ErrorBoundary } from '../components/common/ErrorBoundary.js';
 import { ScreenRouter } from '../components/dashboard/ScreenRouter.js';
+import { SplashScreen } from '../components/dashboard/SplashScreen.js';
 import { useDashboardData } from '../hooks/useDashboardData.js';
 import { useDashboardInput } from '../hooks/useDashboardInput.js';
 import { createBar } from '../../utils/resources.js';
@@ -27,6 +27,7 @@ const DashboardContent: React.FC = () => {
     moduleNames?: string[];
   } | null>(null);
   const [selectedModules, setSelectedModules] = useState<Set<string>>(new Set());
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
 
   // Data Hook
   const data = useDashboardData();
@@ -48,8 +49,7 @@ const DashboardContent: React.FC = () => {
     orchestrator,
   } = data;
 
-  // Filter & Sort Logic (kept here as it depends on local UI state like search/sort preference)
-  // We could move this to a hook too, but it's lightweight enough here for now.
+  // Filter & Sort Logic
   const filteredModules = useMemo(() => {
     if (!debouncedSearchQuery) return modules;
     const fuse = new Fuse(modules, {
@@ -97,10 +97,6 @@ const DashboardContent: React.FC = () => {
     searchQuery,
     setSearchQuery: (q) => {
       setSearchQuery(q);
-      // Debounce logic is inside SearchModal for the modal input,
-      // but for direct slash command key presses we might need this.
-      // Although slash just opens the modal now.
-      setDebouncedSearchQuery(q);
     },
     selectedModule,
     setSelectedModule,
@@ -113,12 +109,17 @@ const DashboardContent: React.FC = () => {
     setLastKey,
     handleExit: () => exit(),
     data,
+    showQuitConfirm,
+    setShowQuitConfirm,
   });
 
-  // Handle Debounce for Search
-  // If we wanted to keep the legacy inline search behavior we'd need the useEffect here,
-  // but we moved to SearchModal.
-  // Render sub-screens via Router
+  // Handle Debounce for Search Filtering
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 150);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
   const subScreen = (
     <ScreenRouter
       screen={screen}
@@ -143,12 +144,36 @@ const DashboardContent: React.FC = () => {
   // But ScreenRouter only returns if it matches a screen.
   // We need to handle loading/error for 'dashboard' screen too if ScreenRouter didn't catch it.
 
-  if (loading) return subScreen; // ScreenRouter handles loading
-  if (error) return subScreen;   // ScreenRouter handles error
-
   // Main Dashboard Render
+  if (loading) {
+     return <SplashScreen theme={theme} />;
+  }
+
+  // Quit Confirmation Modal (replaces entire UI)
+  if (showQuitConfirm) {
+    return (
+      <Box flexGrow={1} flexDirection="column" alignItems="center" justifyContent="center">
+        <Box
+          borderStyle="double"
+          borderColor="red"
+          paddingX={2}
+          paddingY={1}
+          flexDirection="column"
+          alignItems="center"
+        >
+          <Text bold color="red">⚠️  Quit Canto?</Text>
+          <Text>Are you sure you want to exit?</Text>
+          <Box marginTop={1}>
+            <Text bold color={theme.colors.success}>[Y] Yes  </Text>
+            <Text bold color={theme.colors.error}>[N] No</Text>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+
   return (
-    <Box flexDirection="row" width="100%">
+    <Box flexDirection="row" flexGrow={1} overflow="hidden">
       {/* Sidebar */}
       <Sidebar
         theme={theme}
@@ -157,24 +182,10 @@ const DashboardContent: React.FC = () => {
         onNavigate={setScreen}
       />
 
-      {searchMode && (
-        <SearchModal
-          theme={theme}
-          initialQuery={searchQuery}
-          onSearch={(query) => {
-             setSearchQuery(query);
-             setDebouncedSearchQuery(query);
-          }}
-          onClose={() => {
-            setSearchMode(false);
-            if (!searchQuery) {
-              setDebouncedSearchQuery('');
-            }
-          }}
-        />
-      )}
-
-      <Box flexDirection="column" flexGrow={1}>
+      {/* Main Content Area */}
+      <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
+         {screen !== 'dashboard' ? subScreen : (
+           <>
         {/* Modern Header */}
         <ModernHeader
           systemResources={systemResources}
@@ -204,6 +215,9 @@ const DashboardContent: React.FC = () => {
           marginBottom={1}
           flexDirection="column"
           flexGrow={1}
+          flexShrink={1}
+          overflow="hidden"
+          minWidth={0}
         >
           <Box marginBottom={1}>
             <Text bold color={theme.colors.warning}>
@@ -217,17 +231,20 @@ const DashboardContent: React.FC = () => {
           {sortedModules.length === 0 ? (
             <Text dimColor>No modules match "{searchQuery}"</Text>
           ) : (
-            sortedModules.map((module, index) => (
-              <ModuleCard
-                key={module.name}
-                module={module}
-                isSelected={index === selectedModule}
-                isFavorite={prefsManager.isFavorite(module.name)}
-                isChecked={selectedModules.has(module.name)}
-                autoRestartState={autoRestartManager.getState(module.name)}
-                theme={theme}
-              />
-            ))
+            <Box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden" minWidth={0}>
+              {sortedModules.map((module, index) => (
+                <ModuleRow
+                  key={module.name}
+                  module={module}
+                  isSelected={index === selectedModule}
+                  searchQuery={searchQuery}
+                  isFavorite={prefsManager.isFavorite(module.name)}
+                  isChecked={selectedModules.has(module.name)}
+                  autoRestartState={autoRestartManager.getState(module.name)}
+                  theme={theme}
+                />
+              ))}
+            </Box>
           )}
         </Box>
 
@@ -365,6 +382,8 @@ const DashboardContent: React.FC = () => {
             </Box>
           </Box>
         )}
+           </>
+         )}
       </Box>
     </Box>
   );
@@ -411,11 +430,13 @@ export async function dashboardCommand(): Promise<void> {
   try {
     const instance = render(<Dashboard />);
     await instance.waitUntilExit();
+  } catch (err) {
+    console.error('Dashboard error:', err);
   } finally {
     cleanup();
-    // Force exit after 500ms if cleanup is slow
+    // Force exit after 100ms if cleanup is slow
     setTimeout(() => {
       process.exit(0);
-    }, 500);
+    }, 100);
   }
 }

@@ -2,10 +2,16 @@ import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { ModuleStatus } from '../../types.js';
 import { formatMemory, formatCPU } from '../../../utils/resources.js';
-import { checkResourceAlerts, getAlertIcon, getAlertColor } from '../../lib/resource-alerts.js';
 import type { ModuleRestartState } from '../../lib/auto-restart-manager.js';
 import type { Theme } from '../../../utils/preferences.js';
-import { getModuleIcon, getStatusIcon } from '../../lib/icons.js';
+import { getModuleIcon } from '../../lib/icons.js';
+import { 
+  getStatusConfig, 
+  formatUptime, 
+  getAutoRestartInfo, 
+  getModuleAlert 
+} from './ModuleStatusUtils.js';
+import { getAlertIcon, getAlertColor } from '../../lib/resource-alerts.js';
 
 interface ModuleCardProps {
   module: ModuleStatus;
@@ -20,57 +26,18 @@ export const ModuleCard: React.FC<ModuleCardProps> = React.memo(
   ({ module, isSelected, isFavorite, isChecked, autoRestartState, theme }) => {
     // Get contextual icon based on module type and name
     const moduleIcon = getModuleIcon(module.type, module.name);
-    const statusIcon = getStatusIcon(module.status);
 
-    // Status configuration with hex colors
-    const statusConfig = {
-      RUNNING: { icon: statusIcon, color: theme.colors.success },
-      STOPPED: { icon: statusIcon, color: theme.colors.muted },
-      STARTING: { icon: statusIcon, color: theme.colors.warning },
-      STOPPING: { icon: statusIcon, color: theme.colors.warning },
-      ERROR: { icon: statusIcon, color: theme.colors.error },
-    };
-
-    const status = statusConfig[module.status as keyof typeof statusConfig] ?? {
-      icon: '?',
-      color: theme.colors.muted,
-    };
+    // Get status configuration using shared util
+    const status = getStatusConfig(module.status, theme);
 
     const favoriteIcon = isFavorite ? '★' : '☆';
     const checkboxIcon = isChecked ? '☑' : '☐';
 
-    // Check for resource alerts
-    const alerts = checkResourceAlerts(module);
-    const criticalAlert = alerts.find((a) => a.level === 'critical');
-    const warningAlert = alerts.find((a) => a.level === 'warning');
-    const alert = criticalAlert ?? warningAlert;
+    // Check for resource alerts using shared util
+    const alert = getModuleAlert(module);
 
-    // Format auto-restart info
-    const autoRestartInfo = useMemo(() => {
-      if (!autoRestartState?.nextRetryAt) return null;
-
-      const now = Date.now();
-      const nextRetry = autoRestartState.nextRetryAt.getTime();
-      const secondsRemaining = Math.max(0, Math.ceil((nextRetry - now) / 1000));
-
-      return {
-        retryCount: autoRestartState.retryCount,
-        secondsRemaining,
-        isRestarting: autoRestartState.isRestarting,
-      };
-    }, [autoRestartState]);
-
-    // Format uptime helper
-    const formatUptime = (ms: number): string => {
-      const seconds = Math.floor(ms / 1000);
-      if (seconds < 60) return `${seconds}s`;
-      const minutes = Math.floor(seconds / 60);
-      if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-      const hours = Math.floor(minutes / 60);
-      if (hours < 24) return `${hours}h ${minutes % 60}m`;
-      const days = Math.floor(hours / 24);
-      return `${days}d ${hours % 24}h`;
-    };
+    // Format auto-restart info using shared util
+    const autoRestartInfo = useMemo(() => getAutoRestartInfo(autoRestartState), [autoRestartState]);
 
     // Collect all ports from containers for inline display
     const allPorts = (module.containers ?? []).flatMap((c) => c.ports).filter((p) => p.length > 0);
@@ -225,3 +192,4 @@ export const ModuleCard: React.FC<ModuleCardProps> = React.memo(
 );
 
 ModuleCard.displayName = 'ModuleCard';
+

@@ -62,7 +62,7 @@ export class DashboardDataManager {
     if (this.isInitialized) {
       return;
     }
-
+    
     // Load config once on startup
     await this.loadInitialConfig();
 
@@ -301,7 +301,7 @@ export class DashboardDataManager {
 
       // Get process resources if we have a PID
       if (pid) {
-        const resources = getProcessResources(pid);
+        const resources = await getProcessResources(pid);
         if (resources) {
           moduleStatus.cpu = resources.cpu;
           moduleStatus.memory = resources.memory;

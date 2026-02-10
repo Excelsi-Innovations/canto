@@ -37,7 +37,7 @@ export const HistoryScreen: React.FC<ScreenProps> = React.memo(({ onBack, onQuit
   return (
     <Box flexDirection="column" padding={1}>
       <Box borderStyle="double" borderColor="blue" padding={1} marginBottom={1}>
-        <Box flexDirection="column" width="100%">
+        <Box flexDirection="column" flexGrow={1} flexShrink={1}>
           <Text bold color="blue">
             📜 COMMAND HISTORY
           </Text>
