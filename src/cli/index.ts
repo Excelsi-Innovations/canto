@@ -16,7 +16,7 @@ import { errorBox } from './utils/format.js';
 
 // Global error handlers - NEVER let Canto crash!
 process.on('uncaughtException', (error: Error) => {
-  console.error(`\n${  errorBox('Uncaught Exception', error.message)}`);
+  console.error(`\n${errorBox('Uncaught Exception', error.message)}`);
   console.error(pc.dim('\nStack trace:'));
   console.error(pc.dim(error.stack ?? 'No stack trace available'));
   console.error(pc.yellow('\n⚠️  Canto is still running. Use Ctrl+C to exit.\n'));
@@ -24,7 +24,7 @@ process.on('uncaughtException', (error: Error) => {
 
 process.on('unhandledRejection', (reason: unknown) => {
   const message = reason instanceof Error ? reason.message : String(reason);
-  console.error(`\n${  errorBox('Unhandled Promise Rejection', message)}`);
+  console.error(`\n${errorBox('Unhandled Promise Rejection', message)}`);
   if (reason instanceof Error && reason.stack) {
     console.error(pc.dim('\nStack trace:'));
     console.error(pc.dim(reason.stack));
@@ -112,7 +112,7 @@ program.action(async () => {
   const { existsSync } = await import('node:fs');
   const { join } = await import('node:path');
   const configPath = join(process.cwd(), 'dev.config.yaml');
-  
+
   if (!existsSync(configPath)) {
     // No config found, run init wizard
     console.log(pc.yellow('\n⚠️  No configuration found. Running init wizard...\n'));

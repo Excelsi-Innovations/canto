@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Box, Text } from 'ink';
 import type { Screen, ModuleStatus } from '../../types.js';
 import type { ModuleOrchestrator } from '../../../modules/index.js';
+import type { ProcessManager } from '../../../processes/manager.js';
 import { HelpScreen } from './HelpScreen.js';
 import { EnvScreen } from './EnvScreen.js';
 import { LogsScreen } from './LogsScreen.js';
 import { HistoryScreen } from './HistoryScreen.js';
 import { ModuleDetailsScreen } from './ModuleDetailsScreen.js';
+import { CommanderScreen } from './CommanderScreen.js';
 import { SplashScreen } from './SplashScreen.js';
 import type { Theme } from '../../../utils/preferences.js';
 
@@ -19,6 +21,7 @@ interface ScreenRouterProps {
   selectedModuleIndex: number;
   sortedModules: ModuleStatus[];
   orchestrator: ModuleOrchestrator;
+  processManager: ProcessManager;
   setScreen: (screen: Screen) => void;
   handleExit: () => void;
 }
@@ -32,9 +35,13 @@ export const ScreenRouter: React.FC<ScreenRouterProps> = ({
   selectedModuleIndex,
   sortedModules,
   orchestrator,
+  processManager,
   setScreen,
   handleExit,
 }) => {
+  const handleBack = useCallback(() => setScreen('dashboard'), [setScreen]);
+  const handleQuit = useCallback(() => handleExit(), [handleExit]);
+
   if (loading) {
     return <SplashScreen theme={theme} />;
   }
@@ -53,11 +60,11 @@ export const ScreenRouter: React.FC<ScreenRouterProps> = ({
   }
 
   if (screen === 'help') {
-    return <HelpScreen onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
+    return <HelpScreen onBack={handleBack} onQuit={handleQuit} />;
   }
 
   if (screen === 'env') {
-    return <EnvScreen onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
+    return <EnvScreen onBack={handleBack} onQuit={handleQuit} />;
   }
 
   if (screen === 'logs') {
@@ -65,20 +72,31 @@ export const ScreenRouter: React.FC<ScreenRouterProps> = ({
       <LogsScreen
         modules={modules}
         selectedModule={selectedModuleIndex}
-        onBack={() => setScreen('dashboard')}
-        onQuit={handleExit}
+        onBack={handleBack}
+        onQuit={handleQuit}
       />
     );
   }
 
   if (screen === 'history') {
-    return <HistoryScreen onBack={() => setScreen('dashboard')} onQuit={handleExit} />;
+    return <HistoryScreen onBack={handleBack} onQuit={handleQuit} />;
+  }
+
+  if (screen === 'commander') {
+    return (
+      <CommanderScreen
+        onBack={handleBack}
+        onQuit={handleQuit}
+        theme={theme}
+        processManager={processManager}
+      />
+    );
   }
 
   if (screen === 'details') {
     const module = sortedModules[selectedModuleIndex];
-    // Orchestrator might act differently if invoked directly vs via hook, 
-    // but here we just need to get module config. 
+    // Orchestrator might act differently if invoked directly vs via hook,
+    // but here we just need to get module config.
     // Ensure orchestrator is passed correctly from useDashboardData
     const moduleConfig = module ? orchestrator.getModule(module.name) : null;
 

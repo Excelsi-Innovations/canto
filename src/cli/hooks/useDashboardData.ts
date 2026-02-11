@@ -56,7 +56,7 @@ export function useDashboardData() {
   // Static Info
   // Static Info
   const [gitBranch, setGitBranch] = useState<string>('');
-  
+
   useEffect(() => {
     import('child_process').then(({ exec }) => {
       exec('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }, (err, stdout) => {
@@ -112,8 +112,8 @@ export function useDashboardData() {
         // Ensure splash screen shows for at least 1.5s to prevent flickering
         // and allow user to see the branding/loading state.
         await Promise.all([
-            dataManager.initialize(),
-            new Promise((resolve) => setTimeout(resolve, 1500))
+          dataManager.initialize(),
+          new Promise((resolve) => setTimeout(resolve, 1500)),
         ]);
         setLoading(false);
       } catch (err) {
@@ -176,7 +176,7 @@ export function useDashboardData() {
     modules.forEach((module) => {
       const state = autoRestartManager.getState(module.name);
 
-      if (module.status === 'ERROR' && (!state?.isRestarting)) {
+      if (module.status === 'ERROR' && !state?.isRestarting) {
         const restartKey = `${module.name}-restart`;
 
         if (!shownAutoRestartAlerts.current.has(restartKey)) {
@@ -211,7 +211,15 @@ export function useDashboardData() {
         shownAutoRestartAlerts.current.delete(`${module.name}-restart`);
       }
     });
-  }, [modules, autoRestartManager, orchestrator, prefsManager, showToast, triggerUpdate, dataManager]);
+  }, [
+    modules,
+    autoRestartManager,
+    orchestrator,
+    prefsManager,
+    showToast,
+    triggerUpdate,
+    dataManager,
+  ]);
 
   // Cleanup Auto Restart
   useEffect(() => {
@@ -306,50 +314,53 @@ export function useDashboardData() {
     [orchestrator, isProcessing, dataManager, prefsManager, showToast, triggerUpdate]
   );
 
-  return useMemo(() => ({
-    modules,
-    setModules,
-    loading,
-    error,
-    isProcessing,
-    systemResources,
-    toasts,
-    showToast,
-    bulkOperationProgress,
-    processManager,
-    orchestrator,
-    dataManager,
-    prefsManager,
-    resourceHistory,
-    autoRestartManager,
-    gitBranch,
-    cwdName,
-    nodeVersion,
-    theme,
-    triggerUpdate,
-    executeModuleAction,
-    executeBulkAction,
-  }), [
-    modules,
-    loading,
-    error,
-    isProcessing,
-    systemResources,
-    toasts,
-    showToast,
-    bulkOperationProgress,
-    processManager,
-    orchestrator,
-    dataManager,
-    prefsManager,
-    resourceHistory,
-    autoRestartManager,
-    gitBranch,
-    cwdName,
-    nodeVersion,
-    theme,
-    triggerUpdate,
-    executeModuleAction,
-    executeBulkAction,
-  ]);
+  return useMemo(
+    () => ({
+      modules,
+      setModules,
+      loading,
+      error,
+      isProcessing,
+      systemResources,
+      toasts,
+      showToast,
+      bulkOperationProgress,
+      processManager,
+      orchestrator,
+      dataManager,
+      prefsManager,
+      resourceHistory,
+      autoRestartManager,
+      gitBranch,
+      cwdName,
+      nodeVersion,
+      theme,
+      triggerUpdate,
+      executeModuleAction,
+      executeBulkAction,
+    }),
+    [
+      modules,
+      loading,
+      error,
+      isProcessing,
+      systemResources,
+      toasts,
+      showToast,
+      bulkOperationProgress,
+      processManager,
+      orchestrator,
+      dataManager,
+      prefsManager,
+      resourceHistory,
+      autoRestartManager,
+      gitBranch,
+      cwdName,
+      nodeVersion,
+      theme,
+      triggerUpdate,
+      executeModuleAction,
+      executeBulkAction,
+    ]
+  );
 }

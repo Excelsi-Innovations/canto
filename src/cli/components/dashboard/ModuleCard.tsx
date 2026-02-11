@@ -5,11 +5,11 @@ import { formatMemory, formatCPU } from '../../../utils/resources.js';
 import type { ModuleRestartState } from '../../lib/auto-restart-manager.js';
 import type { Theme } from '../../../utils/preferences.js';
 import { getModuleIcon } from '../../lib/icons.js';
-import { 
-  getStatusConfig, 
-  formatUptime, 
-  getAutoRestartInfo, 
-  getModuleAlert 
+import {
+  getStatusConfig,
+  formatUptime,
+  getAutoRestartInfo,
+  getModuleAlert,
 } from './ModuleStatusUtils.js';
 import { getAlertIcon, getAlertColor } from '../../lib/resource-alerts.js';
 
@@ -192,4 +192,3 @@ export const ModuleCard: React.FC<ModuleCardProps> = React.memo(
 );
 
 ModuleCard.displayName = 'ModuleCard';
-

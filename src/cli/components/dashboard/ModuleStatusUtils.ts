@@ -11,13 +11,13 @@ export interface ModuleStatusConfig {
 
 export const getStatusConfig = (status: string, theme: Theme): ModuleStatusConfig => {
   const statusIcon = getStatusIcon(status);
-  
+
   // Map to theme colors or direct hex/string colors depending on how they are used.
   // ModuleRow used 'green', 'gray' strings. ModuleCard used theme.colors.success.
-  // We will standardize on using the Theme object for consistency if possible, 
-  // but ModuleRow seemed to use specific ink color names. 
+  // We will standardize on using the Theme object for consistency if possible,
+  // but ModuleRow seemed to use specific ink color names.
   // Let's try to map to Theme colors which usually map to ink standard colors.
-  
+
   const config: Record<string, ModuleStatusConfig> = {
     RUNNING: { icon: statusIcon, color: theme.colors.success },
     STOPPED: { icon: statusIcon, color: theme.colors.muted },
@@ -46,7 +46,9 @@ export interface AutoRestartInfo {
   isRestarting: boolean;
 }
 
-export const getAutoRestartInfo = (autoRestartState: ModuleRestartState | null): AutoRestartInfo | null => {
+export const getAutoRestartInfo = (
+  autoRestartState: ModuleRestartState | null
+): AutoRestartInfo | null => {
   if (!autoRestartState?.nextRetryAt) return null;
 
   const now = Date.now();
@@ -61,8 +63,8 @@ export const getAutoRestartInfo = (autoRestartState: ModuleRestartState | null):
 };
 
 export const getModuleAlert = (module: ModuleStatus): ResourceAlert | undefined => {
-    const alerts = checkResourceAlerts(module);
-    const criticalAlert = alerts.find((a) => a.level === 'critical');
-    const warningAlert = alerts.find((a) => a.level === 'warning');
-    return criticalAlert ?? warningAlert;
+  const alerts = checkResourceAlerts(module);
+  const criticalAlert = alerts.find((a) => a.level === 'critical');
+  const warningAlert = alerts.find((a) => a.level === 'warning');
+  return criticalAlert ?? warningAlert;
 };

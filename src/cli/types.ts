@@ -17,7 +17,15 @@ export interface ModuleStatus {
   }>;
 }
 
-export type Screen = 'dashboard' | 'modules' | 'logs' | 'env' | 'help' | 'history' | 'details';
+export type Screen =
+  | 'dashboard'
+  | 'modules'
+  | 'logs'
+  | 'env'
+  | 'help'
+  | 'history'
+  | 'details'
+  | 'commander';
 
 export interface ScreenProps {
   onBack: () => void;

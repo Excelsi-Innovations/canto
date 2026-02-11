@@ -70,8 +70,7 @@ export async function logsCommand(target: string, options: LogsOptions): Promise
           errorBox(
             `${icons.error} Container not found`,
             `Container "${containerName}" not found in module "${moduleName}".\n\n` +
-              `Available containers:\n${
-              services
+              `Available containers:\n${services
                 .filter((s) => s.container)
                 .map((s) => `  • ${s.container?.name}`)
                 .join('\n')}`,

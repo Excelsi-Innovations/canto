@@ -5,6 +5,7 @@ import { icons, colors, moduleTypeIcon } from '../utils/display.js';
 import { errorBox, columns } from '../utils/format.js';
 import { DockerExecutor } from '../../modules/docker.js';
 import { getContainerStatusDisplay, formatPorts } from '../../utils/docker.js';
+import { ProcessStatus } from '../../processes/types.js';
 
 interface StatusOptions {
   verbose?: boolean;
@@ -61,7 +62,7 @@ export async function statusCommand(_options: StatusOptions): Promise<void> {
 
           const isRunning = services.some((s) => s.container?.status === 'running');
 
-          if (isRunning || status === 'RUNNING') {
+          if (isRunning || status?.status === ProcessStatus.RUNNING) {
             runningModules.push(moduleHeader);
 
             // Container rows
@@ -117,13 +118,15 @@ export async function statusCommand(_options: StatusOptions): Promise<void> {
         } else {
           // No services found, show as regular module
           const row = [
-            status === 'RUNNING' ? colors.success(icons.success) : colors.dim(icons.stopped),
+            status?.status === ProcessStatus.RUNNING
+              ? colors.success(icons.success)
+              : colors.dim(icons.stopped),
             colors.bold(name),
             `${icon} ${module.type}`,
             pid ? `PID ${pid}${portInfo}` : 'Not running',
           ];
 
-          if (status === 'RUNNING') {
+          if (status?.status === ProcessStatus.RUNNING) {
             runningModules.push(row);
           } else {
             stoppedModules.push(row);
@@ -132,13 +135,15 @@ export async function statusCommand(_options: StatusOptions): Promise<void> {
       } else {
         // Non-Docker modules
         const row = [
-          status === 'RUNNING' ? colors.success(icons.success) : colors.dim(icons.stopped),
+          status?.status === ProcessStatus.RUNNING
+            ? colors.success(icons.success)
+            : colors.dim(icons.stopped),
           colors.bold(name),
           `${icon} ${module.type}`,
           pid ? `PID ${pid}${portInfo}` : 'Not running',
         ];
 
-        if (status === 'RUNNING') {
+        if (status?.status === ProcessStatus.RUNNING) {
           runningModules.push(row);
         } else {
           stoppedModules.push(row);

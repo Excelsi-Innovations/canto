@@ -7,6 +7,29 @@ export class ProcessManager {
   private childProcesses: Map<string, ChildProcess> = new Map();
   private loggers: Map<string, ProcessLogger> = new Map();
 
+  // Log handling
+  private outputs: Map<string, string[]> = new Map();
+  private listeners: Map<string, Set<(data: string) => void>> = new Map();
+
+  /**
+   * Subscribe to process output
+   */
+  subscribe(id: string, callback: (data: string) => void): () => void {
+    let listenerSet = this.listeners.get(id);
+    if (!listenerSet) {
+      listenerSet = new Set();
+      this.listeners.set(id, listenerSet);
+    }
+    listenerSet.add(callback);
+    return () => {
+      this.listeners.get(id)?.delete(callback);
+    };
+  }
+
+  getLogs(id: string): string[] {
+    return this.outputs.get(id) ?? [];
+  }
+
   /**
    * Spawn a new process
    *
@@ -72,12 +95,38 @@ export class ProcessManager {
 
       childProcess.stdout?.on('data', (data: Buffer) => {
         const text = data.toString();
+
+        // Store output
+        let buffer = this.outputs.get(id);
+        if (!buffer) {
+          buffer = [];
+          this.outputs.set(id, buffer);
+        }
+        buffer.push(text);
+        if (buffer.length > 2000) buffer.shift(); // Limit history
+
+        // Notify listeners
+        this.listeners.get(id)?.forEach((cb) => cb(text));
+
         this.loggers.get(id)?.stdout(text, id);
         if (onData) onData(text);
       });
 
       childProcess.stderr?.on('data', (data: Buffer) => {
         const text = data.toString();
+
+        // Store output (stderr)
+        let buffer = this.outputs.get(id);
+        if (!buffer) {
+          buffer = [];
+          this.outputs.set(id, buffer);
+        }
+        buffer.push(text);
+        if (buffer.length > 2000) buffer.shift();
+
+        // Notify listeners
+        this.listeners.get(id)?.forEach((cb) => cb(text));
+
         this.loggers.get(id)?.stderr(text, id);
         if (onError) onError(text);
       });
@@ -262,6 +311,13 @@ export class ProcessManager {
   }
 
   /**
+   * Get process info by ID
+   */
+  getStatus(id: string): ProcessInfo | undefined {
+    return this.processes.get(id);
+  }
+
+  /**
    * Check if a process is currently running
    *
    * @param id - Process ID
@@ -284,18 +340,6 @@ export class ProcessManager {
     );
 
     await Promise.all(runningProcesses.map((p) => this.stop(p.id, signal)));
-  }
-
-  /**
-   * Get process status by ID
-   *
-   * @param id - Process ID
-   * @returns Process status string
-   */
-  getStatus(id: string): string {
-    const process = this.processes.get(id);
-    if (!process) return 'STOPPED';
-    return process.status;
   }
 
   /**

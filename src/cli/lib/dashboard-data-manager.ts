@@ -62,7 +62,7 @@ export class DashboardDataManager {
     if (this.isInitialized) {
       return;
     }
-    
+
     // Load config once on startup
     await this.loadInitialConfig();
 
@@ -313,9 +313,11 @@ export class DashboardDataManager {
         try {
           const services = this.dockerExecutor.getServices(module);
           moduleStatus.containers = services
-            .filter((s): s is typeof s & { container: NonNullable<typeof s.container> } => !!s.container)
+            .filter(
+              (s): s is typeof s & { container: NonNullable<typeof s.container> } => !!s.container
+            )
             .map((s) => {
-              const {container} = s;
+              const { container } = s;
               return {
                 name: container.name,
                 status: container.status,

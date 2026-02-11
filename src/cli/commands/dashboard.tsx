@@ -13,10 +13,17 @@ import { useDashboardData } from '../hooks/useDashboardData.js';
 import { useDashboardInput } from '../hooks/useDashboardInput.js';
 import { createBar } from '../../utils/resources.js';
 
+import { ProcessManager } from '../../processes/manager.js';
+
 const DashboardContent: React.FC = () => {
   const { exit } = useApp();
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [selectedModule, setSelectedModule] = useState(0);
+
+  // Process Manager for background tasks (Commander)
+  // Persists across screen navigation
+  const processManager = useMemo(() => new ProcessManager(), []);
+
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -49,7 +56,6 @@ const DashboardContent: React.FC = () => {
     orchestrator,
   } = data;
 
-  // Filter & Sort Logic
   const filteredModules = useMemo(() => {
     if (!debouncedSearchQuery) return modules;
     const fuse = new Fuse(modules, {
@@ -133,14 +139,15 @@ const DashboardContent: React.FC = () => {
       selectedModuleIndex={selectedModule}
       sortedModules={sortedModules}
       orchestrator={orchestrator}
+      processManager={processManager}
       setScreen={setScreen}
       handleExit={() => exit()}
     />
   );
 
   if (subScreen) {
-    // ScreenRouter returns null if screen is 'dashboard' (or unknown), so we render dashboard below
-    if (screen !== 'dashboard') return subScreen;
+    // ScreenRouter returns null if screen is 'dashboard', 'modules' or unknown
+    if (screen !== 'dashboard' && screen !== 'modules') return subScreen;
   }
 
   // If loading/error caught by ScreenRouter, they returned early.
@@ -149,7 +156,7 @@ const DashboardContent: React.FC = () => {
 
   // Main Dashboard Render
   if (loading) {
-     return <SplashScreen theme={theme} />;
+    return <SplashScreen theme={theme} />;
   }
 
   // Quit Confirmation Modal (replaces entire UI)
@@ -164,11 +171,17 @@ const DashboardContent: React.FC = () => {
           flexDirection="column"
           alignItems="center"
         >
-          <Text bold color="red">⚠️  Quit Canto?</Text>
+          <Text bold color="red">
+            ⚠️ Quit Canto?
+          </Text>
           <Text>Are you sure you want to exit?</Text>
           <Box marginTop={1}>
-            <Text bold color={theme.colors.success}>[Y] Yes  </Text>
-            <Text bold color={theme.colors.error}>[N] No</Text>
+            <Text bold color={theme.colors.success}>
+              [Y] Yes{' '}
+            </Text>
+            <Text bold color={theme.colors.error}>
+              [N] No
+            </Text>
           </Box>
         </Box>
       </Box>
@@ -178,227 +191,245 @@ const DashboardContent: React.FC = () => {
   return (
     <Box flexDirection="row" flexGrow={1} overflow="hidden">
       {/* Sidebar */}
-      <Sidebar
-        theme={theme}
-        stats={stats}
-        selectedScreen={screen}
-        onNavigate={setScreen}
-      />
+      <Sidebar theme={theme} stats={stats} selectedScreen={screen} onNavigate={setScreen} />
 
       {/* Main Content Area */}
       <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-         {/* Show subScreen for non-dashboard/modules screens, otherwise show dashboard content */}
-         {screen !== 'dashboard' && screen !== 'modules' ? subScreen : (
-           <>
-        {/* Modern Header */}
-        <ModernHeader
-          systemResources={systemResources}
-          resourceHistory={resourceHistory}
-          isProcessing={isProcessing}
-          theme={theme}
-        />
+        {/* Show subScreen for non-dashboard/modules screens, otherwise show dashboard content */}
+        {screen !== 'dashboard' && screen !== 'modules' ? (
+          subScreen
+        ) : (
+          <>
+            {/* Modern Header */}
+            <ModernHeader
+              systemResources={systemResources}
+              resourceHistory={resourceHistory}
+              isProcessing={isProcessing}
+              theme={theme}
+            />
 
-        {/* Search Bar Info (Overlay?) */}
-        {searchMode && (
-          <Box borderStyle="round" borderColor={theme.colors.primary} padding={1} marginBottom={1}>
-            <Text>
-              <Text color={theme.colors.primary}>🔍 Search: </Text>
-              <Text bold>{searchQuery}</Text>
-              <Text color={theme.colors.primary}>_</Text>
-              <Text dimColor> (ESC to clear)</Text>
-            </Text>
-          </Box>
-        )}
-
-        {/* Modules */}
-        <Box
-          borderStyle="round"
-          borderColor={theme.colors.border}
-          paddingX={1}
-          paddingY={0}
-          marginBottom={1}
-          flexDirection="column"
-          flexGrow={1}
-          flexShrink={1}
-          overflow="hidden"
-          minWidth={0}
-        >
-          {loading ? (
-            <Box flexGrow={1} justifyContent="center" alignItems="center">
-              <Text>Loading modules...</Text>
-            </Box>
-          ) : (
-            <>
-              <Box marginBottom={1}>
-                <Text bold color={theme.colors.warning}>
-                  📦 {sortedModules.length} Module{sortedModules.length !== 1 ? 's' : ''}
-                  {selectedModules.size > 0 && (
-                    <Text color={theme.colors.info}> • {selectedModules.size} selected</Text>
-                  )}
+            {/* Search Bar Info (Overlay?) */}
+            {searchMode && (
+              <Box
+                borderStyle="round"
+                borderColor={theme.colors.primary}
+                padding={1}
+                marginBottom={1}
+              >
+                <Text>
+                  <Text color={theme.colors.primary}>🔍 Search: </Text>
+                  <Text bold>{searchQuery}</Text>
+                  <Text color={theme.colors.primary}>_</Text>
+                  <Text dimColor> (ESC to clear)</Text>
                 </Text>
               </Box>
+            )}
 
-              {sortedModules.length === 0 ? (
-                <Box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column">
-                  <Text dimColor>No modules match "{searchQuery}"</Text>
-                  <Text dimColor>Check your dev.config.yaml or clear search.</Text>
+            {/* Modules */}
+            <Box
+              borderStyle="round"
+              borderColor={theme.colors.border}
+              paddingX={1}
+              paddingY={0}
+              marginBottom={1}
+              flexDirection="column"
+              flexGrow={1}
+              flexShrink={1}
+              overflow="hidden"
+              minWidth={0}
+            >
+              {loading ? (
+                <Box flexGrow={1} justifyContent="center" alignItems="center">
+                  <Text>Loading modules...</Text>
                 </Box>
               ) : (
-                <Box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden" minWidth={0}>
-                  {sortedModules.map((module, index) => (
-                    <ModuleRow
-                      key={module.name}
-                      module={module}
-                      isSelected={index === selectedModule}
-                      searchQuery={searchQuery}
-                      isFavorite={prefsManager.isFavorite(module.name)}
-                      isChecked={selectedModules.has(module.name)}
-                      autoRestartState={autoRestartManager.getState(module.name)}
-                      theme={theme}
-                    />
-                  ))}
+                <>
+                  <Box marginBottom={1}>
+                    <Text bold color={theme.colors.warning}>
+                      📦 {sortedModules.length} Module{sortedModules.length !== 1 ? 's' : ''}
+                      {selectedModules.size > 0 && (
+                        <Text color={theme.colors.info}> • {selectedModules.size} selected</Text>
+                      )}
+                    </Text>
+                  </Box>
+
+                  {sortedModules.length === 0 ? (
+                    <Box
+                      flexGrow={1}
+                      justifyContent="center"
+                      alignItems="center"
+                      flexDirection="column"
+                    >
+                      <Text dimColor>No modules match "{searchQuery}"</Text>
+                      <Text dimColor>Check your dev.config.yaml or clear search.</Text>
+                    </Box>
+                  ) : (
+                    <Box
+                      flexDirection="column"
+                      flexGrow={1}
+                      flexShrink={1}
+                      overflow="hidden"
+                      minWidth={0}
+                    >
+                      {sortedModules.map((module, index) => (
+                        <ModuleRow
+                          key={module.name}
+                          module={module}
+                          isSelected={index === selectedModule}
+                          searchQuery={searchQuery}
+                          isFavorite={prefsManager.isFavorite(module.name)}
+                          isChecked={selectedModules.has(module.name)}
+                          autoRestartState={autoRestartManager.getState(module.name)}
+                          theme={theme}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </>
+              )}
+            </Box>
+
+            {/* Unified Status Bar */}
+            <Box
+              borderStyle="round"
+              borderColor={theme.colors.border}
+              paddingX={1}
+              marginBottom={1}
+            >
+              {selectedModules.size > 0 ? (
+                <Box justifyContent="space-between" width="100%">
+                  <Box>
+                    <Text bold color={theme.colors.info}>
+                      {selectedModules.size} selected
+                    </Text>
+                    <Text> </Text>
+                    <Text backgroundColor={theme.colors.success} color="black" bold>
+                      {' [S] Start '}
+                    </Text>
+                    <Text> </Text>
+                    <Text backgroundColor={theme.colors.error} color="black" bold>
+                      {' [X] Stop '}
+                    </Text>
+                    <Text> </Text>
+                    <Text backgroundColor={theme.colors.warning} color="black" bold>
+                      {' [R] Restart '}
+                    </Text>
+                    <Text> </Text>
+                    <Text backgroundColor={theme.colors.muted} color="black">
+                      {' [Esc] Clear '}
+                    </Text>
+                  </Box>
+                </Box>
+              ) : (
+                <Box justifyContent="space-between" width="100%">
+                  <Box>
+                    <Text backgroundColor={theme.colors.border} color={theme.colors.primary}>
+                      {' [↕] '}
+                    </Text>
+                    <Text color={theme.colors.muted}> Nav </Text>
+                    <Text backgroundColor={theme.colors.border} color={theme.colors.success}>
+                      {' [↵] '}
+                    </Text>
+                    <Text color={theme.colors.muted}> Open </Text>
+                    <Text backgroundColor={theme.colors.border} color={theme.colors.warning}>
+                      {' [/] '}
+                    </Text>
+                    <Text color={theme.colors.muted}> Search </Text>
+                    <Text backgroundColor={theme.colors.border} color={theme.colors.info}>
+                      {' [F] '}
+                    </Text>
+                    <Text color={theme.colors.muted}> Fav </Text>
+                    <Text backgroundColor={theme.colors.border} color={theme.colors.primary}>
+                      {' [T] '}
+                    </Text>
+                    <Text color={theme.colors.muted}> Theme</Text>
+                  </Box>
+                  <Box>
+                    <Text dimColor color={theme.colors.muted}>
+                      {nodeVersion}
+                      {cwdName ? ` │ ${cwdName}` : ''}
+                      {gitBranch ? ` │ ${gitBranch}` : ''}
+                    </Text>
+                  </Box>
                 </Box>
               )}
-            </>
-          )}
-        </Box>
-
-        {/* Unified Status Bar */}
-        <Box borderStyle="round" borderColor={theme.colors.border} paddingX={1} marginBottom={1}>
-          {selectedModules.size > 0 ? (
-            <Box justifyContent="space-between" width="100%">
-              <Box>
-                <Text bold color={theme.colors.info}>
-                  {selectedModules.size} selected
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.success} color="black" bold>
-                  {' [S] Start '}
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.error} color="black" bold>
-                  {' [X] Stop '}
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.warning} color="black" bold>
-                  {' [R] Restart '}
-                </Text>
-                <Text> </Text>
-                <Text backgroundColor={theme.colors.muted} color="black">
-                  {' [Esc] Clear '}
-                </Text>
-              </Box>
             </Box>
-          ) : (
-            <Box justifyContent="space-between" width="100%">
-              <Box>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.primary}>
-                  {' [↕] '}
-                </Text>
-                <Text color={theme.colors.muted}> Nav </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.success}>
-                  {' [↵] '}
-                </Text>
-                <Text color={theme.colors.muted}> Open </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.warning}>
-                  {' [/] '}
-                </Text>
-                <Text color={theme.colors.muted}> Search </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.info}>
-                  {' [F] '}
-                </Text>
-                <Text color={theme.colors.muted}> Fav </Text>
-                <Text backgroundColor={theme.colors.border} color={theme.colors.primary}>
-                  {' [T] '}
-                </Text>
-                <Text color={theme.colors.muted}> Theme</Text>
-              </Box>
-              <Box>
-                <Text dimColor color={theme.colors.muted}>
-                  {nodeVersion}
-                  {cwdName ? ` │ ${cwdName}` : ''}
-                  {gitBranch ? ` │ ${gitBranch}` : ''}
-                </Text>
-              </Box>
-            </Box>
-          )}
-        </Box>
 
-        {/* Toast Notifications */}
-        {toasts.length > 0 && (
-          <Box flexDirection="column">
-            {toasts.map((toast) => (
-              <Box key={toast.id} marginBottom={0}>
-                <Toast toast={toast} />
+            {/* Toast Notifications */}
+            {toasts.length > 0 && (
+              <Box flexDirection="column">
+                {toasts.map((toast) => (
+                  <Box key={toast.id} marginBottom={0}>
+                    <Toast toast={toast} />
+                  </Box>
+                ))}
               </Box>
-            ))}
-          </Box>
-        )}
+            )}
 
-        {/* Confirmation Modal */}
-        {confirmAction && (
-          <Box borderStyle="double" borderColor="yellow" padding={2} marginTop={1}>
-            <Box flexDirection="column">
-              <Text bold color="yellow">
-                ⚠ Confirm Action
-              </Text>
-              <Box marginTop={1}>
-                {confirmAction.action.startsWith('bulk-') ? (
-                  <Text>
-                    Are you sure you want to{' '}
-                    <Text bold color={confirmAction.action.includes('stop') ? 'red' : 'yellow'}>
-                      {confirmAction.action.replace('bulk-', '')}
-                    </Text>{' '}
-                    <Text bold color="cyan">
-                      {confirmAction.moduleNames?.length ?? 0} module
-                      {(confirmAction.moduleNames?.length ?? 0) > 1 ? 's' : ''}
-                    </Text>
-                    ?
+            {/* Confirmation Modal */}
+            {confirmAction && (
+              <Box borderStyle="double" borderColor="yellow" padding={2} marginTop={1}>
+                <Box flexDirection="column">
+                  <Text bold color="yellow">
+                    ⚠ Confirm Action
                   </Text>
-                ) : (
-                  <Text>
-                    Are you sure you want to{' '}
-                    <Text bold color={confirmAction.action === 'stop' ? 'red' : 'yellow'}>
-                      {confirmAction.action}
-                    </Text>{' '}
-                    <Text bold color="cyan">
-                      {confirmAction.moduleName}
+                  <Box marginTop={1}>
+                    {confirmAction.action.startsWith('bulk-') ? (
+                      <Text>
+                        Are you sure you want to{' '}
+                        <Text bold color={confirmAction.action.includes('stop') ? 'red' : 'yellow'}>
+                          {confirmAction.action.replace('bulk-', '')}
+                        </Text>{' '}
+                        <Text bold color="cyan">
+                          {confirmAction.moduleNames?.length ?? 0} module
+                          {(confirmAction.moduleNames?.length ?? 0) > 1 ? 's' : ''}
+                        </Text>
+                        ?
+                      </Text>
+                    ) : (
+                      <Text>
+                        Are you sure you want to{' '}
+                        <Text bold color={confirmAction.action === 'stop' ? 'red' : 'yellow'}>
+                          {confirmAction.action}
+                        </Text>{' '}
+                        <Text bold color="cyan">
+                          {confirmAction.moduleName}
+                        </Text>
+                        ?
+                      </Text>
+                    )}
+                  </Box>
+                  <Box marginTop={1}>
+                    <Text dimColor>
+                      <Text color="green">[Y]</Text> Confirm • <Text color="red">[N]</Text> Cancel
                     </Text>
-                    ?
-                  </Text>
-                )}
+                  </Box>
+                </Box>
               </Box>
-              <Box marginTop={1}>
-                <Text dimColor>
-                  <Text color="green">[Y]</Text> Confirm • <Text color="red">[N]</Text> Cancel
-                </Text>
-              </Box>
-            </Box>
-          </Box>
-        )}
+            )}
 
-        {/* Bulk Progress */}
-        {bulkOperationProgress && (
-          <Box borderStyle="double" borderColor="cyan" padding={2} marginTop={1}>
-            <Box flexDirection="column">
-              <Text bold color="cyan">
-                🔄 {bulkOperationProgress.operation}ing modules...
-              </Text>
-              <Box marginTop={1}>
-                <Text>
-                  Progress: {bulkOperationProgress.completed}/{bulkOperationProgress.total}
-                </Text>
+            {/* Bulk Progress */}
+            {bulkOperationProgress && (
+              <Box borderStyle="double" borderColor="cyan" padding={2} marginTop={1}>
+                <Box flexDirection="column">
+                  <Text bold color="cyan">
+                    🔄 {bulkOperationProgress.operation}ing modules...
+                  </Text>
+                  <Box marginTop={1}>
+                    <Text>
+                      Progress: {bulkOperationProgress.completed}/{bulkOperationProgress.total}
+                    </Text>
+                  </Box>
+                  <Box marginTop={1}>
+                    <Text dimColor>
+                      {createBar(bulkOperationProgress.completed, bulkOperationProgress.total, 30)}
+                    </Text>
+                  </Box>
+                </Box>
               </Box>
-              <Box marginTop={1}>
-                <Text dimColor>
-                  {createBar(bulkOperationProgress.completed, bulkOperationProgress.total, 30)}
-                </Text>
-              </Box>
-            </Box>
-          </Box>
+            )}
+          </>
         )}
-           </>
-         )}
       </Box>
     </Box>
   );
@@ -406,11 +437,11 @@ const DashboardContent: React.FC = () => {
 
 // Top-level ErrorBoundary Wrapper
 const Dashboard: React.FC = () => {
-    return (
-        <ErrorBoundary>
-            <DashboardContent />
-        </ErrorBoundary>
-    );
+  return (
+    <ErrorBoundary>
+      <DashboardContent />
+    </ErrorBoundary>
+  );
 };
 
 export async function dashboardCommand(): Promise<void> {

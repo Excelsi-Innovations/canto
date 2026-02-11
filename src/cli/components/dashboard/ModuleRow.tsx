@@ -4,11 +4,7 @@ import type { ModuleStatus } from '../../types.js';
 import { formatMemory, createBar } from '../../../utils/resources.js';
 import { getAlertIcon, getAlertColor } from '../../lib/resource-alerts.js';
 import type { ModuleRestartState } from '../../lib/auto-restart-manager.js';
-import { 
-  getStatusConfig, 
-  getAutoRestartInfo, 
-  getModuleAlert 
-} from './ModuleStatusUtils.js';
+import { getStatusConfig, getAutoRestartInfo, getModuleAlert } from './ModuleStatusUtils.js';
 import type { Theme } from '../../../utils/preferences.js';
 
 interface ModuleRowProps {
@@ -21,7 +17,7 @@ interface ModuleRowProps {
   // Added theme prop to match utils requirement, assuming we can update usage or make utils flexible.
   // If ModuleRow is used where theme is not available, we might need a default theme or make it optional.
   // For now, let's look at where it is used.
-  theme: Theme; 
+  theme: Theme;
 }
 
 /**
@@ -69,7 +65,7 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
   }) => {
     // Enhanced status badges with colors using shared util
     const status = getStatusConfig(module.status, theme);
-    
+
     const favoriteIcon = isFavorite ? '★' : '☆';
     const checkboxIcon = isChecked ? '☑' : '☐';
     const highlightedName = useHighlightedText(module.name, searchQuery ?? '');
@@ -84,41 +80,39 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
       <Box marginBottom={1} flexDirection="column" overflow="hidden" minWidth={0}>
         <Box flexDirection="row" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
           {/* Checkbox & Status & Name */}
-          <Box 
+          <Box
             flexGrow={1}
             flexShrink={1}
-            minWidth={0} 
+            minWidth={0}
             overflow="hidden"
             backgroundColor={isSelected ? 'blue' : undefined}
           >
-             <Text
-                color={isSelected ? 'white' : undefined}
-                wrap="truncate-end"
-              >
-                {isSelected ? '❯' : ' '} <Text color={isChecked ? 'cyan' : 'gray'}>{checkboxIcon}</Text>{' '}
-                <Text color={isFavorite ? 'yellow' : 'gray'}>{favoriteIcon}</Text>{' '}
-                <Text color={status.color}>{status.icon}</Text> {highlightedName}
-              </Text>
+            <Text color={isSelected ? 'white' : undefined} wrap="truncate-end">
+              {isSelected ? '❯' : ' '}{' '}
+              <Text color={isChecked ? 'cyan' : 'gray'}>{checkboxIcon}</Text>{' '}
+              <Text color={isFavorite ? 'yellow' : 'gray'}>{favoriteIcon}</Text>{' '}
+              <Text color={status.color}>{status.icon}</Text> {highlightedName}
+            </Text>
           </Box>
 
           {/* Type - flexible width */}
           <Box flexBasis={12} flexShrink={0} marginLeft={1} overflow="hidden">
-             <Text wrap="truncate-end">{module.type}</Text>
+            <Text wrap="truncate-end">{module.type}</Text>
           </Box>
 
           {/* Badges/Alerts - flexible width */}
           <Box flexBasis={18} flexShrink={0} justifyContent="flex-end" overflow="hidden">
-              {alert && <Text color={getAlertColor(alert.level)}> {getAlertIcon(alert.level)}</Text>}
-              {autoRestartInfo && !autoRestartInfo.isRestarting && (
-                <Text color="cyan"> 🔄{autoRestartInfo.secondsRemaining}s</Text>
-              )}
-              {autoRestartInfo?.isRestarting && <Text color="yellow"> ⟳</Text>}
+            {alert && <Text color={getAlertColor(alert.level)}> {getAlertIcon(alert.level)}</Text>}
+            {autoRestartInfo && !autoRestartInfo.isRestarting && (
+              <Text color="cyan"> 🔄{autoRestartInfo.secondsRemaining}s</Text>
+            )}
+            {autoRestartInfo?.isRestarting && <Text color="yellow"> ⟳</Text>}
           </Box>
         </Box>
-        
+
         {/* Resource Row */}
         <Box marginLeft={2}>
-            {module.pid && (
+          {module.pid && (
             <>
               <Text dimColor> PID {module.pid}</Text>
               {module.cpu !== undefined && <Text dimColor> • CPU {module.cpu.toFixed(1)}%</Text>}
@@ -183,7 +177,7 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
       prevProps.isFavorite === nextProps.isFavorite &&
       prevProps.isChecked === nextProps.isChecked &&
       // Check for theme equality if we add it to props
-      prevProps.theme === nextProps.theme; 
+      prevProps.theme === nextProps.theme;
 
     // For objects, do deep comparison only if needed
     if (!areEqual) return false;
@@ -213,4 +207,3 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
 );
 
 ModuleRow.displayName = 'ModuleRow';
-

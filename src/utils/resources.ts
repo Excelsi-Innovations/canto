@@ -150,18 +150,24 @@ export async function getSystemResources(): Promise<SystemResources> {
       const inactivePages = getPages(lines.find((l) => l.includes('Pages inactive')));
       const wiredPages = getPages(lines.find((l) => l.includes('Pages wired down')));
 
-      const { stdout: totalMemOutput } = await execAsync('sysctl hw.memsize', { encoding: 'utf-8' });
-      
+      const { stdout: totalMemOutput } = await execAsync('sysctl hw.memsize', {
+        encoding: 'utf-8',
+      });
+
       const totalMemory = (totalMemOutput.match(/\d+/) ?? ['0'])[0] ?? '0';
       const total = parseInt(totalMemory) / (1024 * 1024);
       const freeMemory = (freePages * pageSize) / (1024 * 1024);
       const usedMemory = ((activePages + inactivePages + wiredPages) * pageSize) / (1024 * 1024);
 
-      const { stdout: cpuCountOutput } = await execAsync('sysctl -n hw.ncpu', { encoding: 'utf-8' });
+      const { stdout: cpuCountOutput } = await execAsync('sysctl -n hw.ncpu', {
+        encoding: 'utf-8',
+      });
       const cpuCount = parseInt(cpuCountOutput.trim() || '1');
 
       // Get CPU usage via top
-      const { stdout: topOutput } = await execAsync('top -l 1 -n 0 | grep "CPU usage"', { encoding: 'utf-8' });
+      const { stdout: topOutput } = await execAsync('top -l 1 -n 0 | grep "CPU usage"', {
+        encoding: 'utf-8',
+      });
       const cpuMatch = topOutput.match(/(\d+\.\d+)% user/);
       const cpuUsage = cpuMatch?.[1] ? parseFloat(cpuMatch[1]) : 0;
 
@@ -188,7 +194,9 @@ export async function getSystemResources(): Promise<SystemResources> {
       const cpuCount = parseInt(cpuCountOutput.trim());
 
       // Get CPU usage from /proc/stat
-      const { stdout: stat } = await execAsync('cat /proc/stat | grep "^cpu "', { encoding: 'utf-8' });
+      const { stdout: stat } = await execAsync('cat /proc/stat | grep "^cpu "', {
+        encoding: 'utf-8',
+      });
       const values = stat.trim().split(/\s+/).slice(1).map(Number);
       const idle = values[3] ?? 0;
       const total = values.reduce((a, b) => a + b, 0);

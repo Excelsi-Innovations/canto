@@ -19,6 +19,7 @@ interface UseDashboardInputProps {
     moduleName?: string;
     moduleNames?: string[];
   } | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setConfirmAction: (action: any) => void;
   selectedModules: Set<string>;
   setSelectedModules: (modules: Set<string>) => void;
@@ -57,7 +58,7 @@ export function useDashboardInput({
     executeModuleAction,
     executeBulkAction,
     triggerUpdate,
-    isProcessing
+    isProcessing,
   } = data;
 
   // Helper Actions
@@ -125,20 +126,20 @@ export function useDashboardInput({
       // Global Quit
       if (input === 'q' || input === 'Q') {
         if (showQuitConfirm) {
-           // If already showing confirm, 'q' does nothing? Or maybe cancels?
-           // Let's keep it simple: 'q' triggers confirm.
-           return;
+          // If already showing confirm, 'q' does nothing? Or maybe cancels?
+          // Let's keep it simple: 'q' triggers confirm.
+          return;
         }
         setShowQuitConfirm(true);
         return;
       }
-      
+
       // Quit Confirmation Handling
       if (showQuitConfirm) {
         if (input === 'y' || input === 'Y' || key.return) {
-           handleExit();
+          handleExit();
         } else if (input === 'n' || input === 'N' || key.escape) {
-           setShowQuitConfirm(false);
+          setShowQuitConfirm(false);
         }
         // Block other inputs
         return;
@@ -202,7 +203,7 @@ export function useDashboardInput({
             return;
           }
           // Accept any printable character (length 1) that isn't a special key
-          if (input && input.length === 1 && !key.ctrl) {
+          if (input?.length === 1 && !key.ctrl) {
             setSearchQuery(searchQuery + input);
           }
           return;
@@ -266,6 +267,8 @@ export function useDashboardInput({
           setScreen('history');
         } else if (input === 'h' || input === 'H' || input === '?') {
           setScreen('help');
+        } else if (input === 'c' || input === 'C') {
+          setScreen('commander');
         } else if (input === 't' || input === 'T') {
           const themeNames = Object.keys(THEMES);
           const currentIndex = themeNames.indexOf(prefsManager.getTheme());
@@ -291,6 +294,6 @@ export function useDashboardInput({
     handleBulkAction,
     toggleModuleSelection,
     selectAllFiltered,
-    clearSelection
+    clearSelection,
   };
 }

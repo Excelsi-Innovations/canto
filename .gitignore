@@ -13,7 +13,7 @@ build/
 
 # npm packages
 *.tgz
-
+.canto/cache/
 # Testing
 coverage/
 *.lcov

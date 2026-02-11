@@ -17,7 +17,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ theme }) => {
     const interval = setInterval(() => {
       setWave((prev) => {
         const next = [...prev];
-        const first = next.shift() || 0;
+        const first = next.shift() ?? 0;
         next.push(first);
         return next;
       });
@@ -59,4 +59,3 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ theme }) => {
     </Box>
   );
 };
-

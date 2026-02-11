@@ -24,19 +24,19 @@ export const ComposerLayout: React.FC<ComposerLayoutProps> = ({
 }) => {
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
-      <ComposerHeader 
-        theme={theme} 
-        step={stepTitle} 
-        currentStep={currentStep} 
-        totalSteps={totalSteps} 
+      <ComposerHeader
+        theme={theme}
+        step={stepTitle}
+        currentStep={currentStep}
+        totalSteps={totalSteps}
       />
 
       {/* Main Content Area */}
-      <Box 
-        borderStyle="round" 
-        borderColor={theme.colors.primary} 
-        paddingX={3} 
-        paddingY={1} 
+      <Box
+        borderStyle="round"
+        borderColor={theme.colors.primary}
+        paddingX={3}
+        paddingY={1}
         flexDirection="column"
         minHeight={15}
       >
@@ -47,32 +47,59 @@ export const ComposerLayout: React.FC<ComposerLayoutProps> = ({
       {showFooter && (
         <Box marginTop={1} borderStyle="single" borderColor={theme.colors.muted} paddingX={2}>
           {footerMode === 'confirm' ? (
-             <Text>
-             <Text backgroundColor={theme.colors.success} color="black" bold> Y </Text>
-             <Text> Confirm </Text>
-             <Text backgroundColor={theme.colors.error} color="white" bold> N </Text>
-             <Text> Cancel </Text>
-             <Text backgroundColor={theme.colors.info} color="black" bold> B </Text>
-             <Text> Back </Text>
-             <Text backgroundColor={theme.colors.muted} color="white" bold> ESC </Text>
-             <Text> Exit</Text>
-           </Text>
+            <Text>
+              <Text backgroundColor={theme.colors.success} color="black" bold>
+                {' '}
+                Y{' '}
+              </Text>
+              <Text> Confirm </Text>
+              <Text backgroundColor={theme.colors.error} color="white" bold>
+                {' '}
+                N{' '}
+              </Text>
+              <Text> Cancel </Text>
+              <Text backgroundColor={theme.colors.info} color="black" bold>
+                {' '}
+                B{' '}
+              </Text>
+              <Text> Back </Text>
+              <Text backgroundColor={theme.colors.muted} color="white" bold>
+                {' '}
+                ESC{' '}
+              </Text>
+              <Text> Exit</Text>
+            </Text>
           ) : footerMode === 'continue' ? (
             <Text>
-              <Text backgroundColor={theme.colors.success} color="black" bold> ↵ ENTER </Text>
+              <Text backgroundColor={theme.colors.success} color="black" bold>
+                {' '}
+                ↵ ENTER{' '}
+              </Text>
               <Text> Continue </Text>
-              <Text backgroundColor={theme.colors.warning} color="black" bold> N </Text>
+              <Text backgroundColor={theme.colors.warning} color="black" bold>
+                {' '}
+                N{' '}
+              </Text>
               <Text> No </Text>
-              <Text backgroundColor={theme.colors.info} color="black" bold> B </Text>
+              <Text backgroundColor={theme.colors.info} color="black" bold>
+                {' '}
+                B{' '}
+              </Text>
               <Text> Back </Text>
-              <Text backgroundColor={theme.colors.muted} color="white" bold> ESC </Text>
+              <Text backgroundColor={theme.colors.muted} color="white" bold>
+                {' '}
+                ESC{' '}
+              </Text>
               <Text> Cancel</Text>
             </Text>
           ) : (
-             <Text>
-                <Text backgroundColor={theme.colors.muted} color="white" bold> ESC </Text>
-                <Text> Cancel</Text>
-             </Text>
+            <Text>
+              <Text backgroundColor={theme.colors.muted} color="white" bold>
+                {' '}
+                ESC{' '}
+              </Text>
+              <Text> Cancel</Text>
+            </Text>
           )}
         </Box>
       )}

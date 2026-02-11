@@ -10,6 +10,8 @@ import { allocatePortsForModules } from '../../utils/ports.js';
 
 interface StartOptions {
   all?: boolean;
+  force?: boolean;
+  noSetup?: boolean;
 }
 
 /**
@@ -46,6 +48,51 @@ export async function startCommand(modules: string[], options: StartOptions): Pr
       }
 
       console.log(`${colors.green(`${icons.success} All prerequisites met`)}\n`);
+    }
+
+    // Smart Setup: Check dependencies
+    if (!options.noSetup) {
+      // console.log(colors.dim('Checking dependencies...'));
+      const { DependencyManager } = await import('../../lib/setup/dependency-manager.js');
+      const depManager = new DependencyManager();
+
+      const workspaceModules = config.modules.filter((m) => m.type === 'workspace');
+      if (workspaceModules.length > 0) {
+        // console.log(colors.dim(`  Verifying dependencies for ${workspaceModules.length} module(s)...`));
+        for (const module of workspaceModules) {
+          await depManager.checkAndInstall(module, options.force);
+        }
+        console.log('');
+      }
+    }
+
+    // Smart Setup: Env Check
+    if (!options.noSetup) {
+      const { diffEnvFiles } = await import('../../utils/env-diff.js');
+      const { join } = await import('node:path');
+      const { existsSync } = await import('node:fs');
+
+      const cwd = process.cwd();
+      const envPath = join(cwd, '.env');
+      const examplePath = join(cwd, '.env.example');
+
+      if (existsSync(examplePath)) {
+        const diff = diffEnvFiles(envPath, examplePath);
+        if (diff.missingKeys.length > 0) {
+          console.log(
+            errorBox(
+              `${icons.warning} Missing Environment Variables`,
+              `Your .env file is missing ${diff.missingKeys.length} variables defined in .env.example.\n` +
+                `Missing: ${diff.missingKeys.slice(0, 5).join(', ')}${diff.missingKeys.length > 5 ? '...' : ''}\n\n` +
+                `${colors.bold('To fix, run:')}\n` +
+                `  ${colors.cyan('canto env --fix')}`,
+              ['Run fix command to interactively add them']
+            )
+          );
+          // Optional: Validation strictness might block start here
+          // For now, we just warn.
+        }
+      }
     }
 
     // Allocate ports if enabled

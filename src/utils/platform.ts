@@ -118,14 +118,14 @@ export function isWSL(): boolean {
  * Get the terminal type
  */
 export function getTerminalType(): string {
-  return process.env['TERM'] || 'unknown';
+  return process.env['TERM'] ?? 'unknown';
 }
 
 /**
  * Checks if terminal supports 256 colors
  */
 export function supports256Colors(): boolean {
-  const term = process.env['TERM'] || '';
+  const term = process.env['TERM'] ?? '';
   return term.includes('256color') || term.includes('24bit') || term.includes('truecolor');
 }
 

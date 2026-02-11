@@ -3,7 +3,7 @@ import { Box, Text, useInput, useApp } from 'ink';
 import Spinner from 'ink-spinner';
 import BigText from 'ink-big-text';
 import type { ProjectDetectionResult } from './detector.js';
-import { getTheme } from '../utils/preferences.js';
+import { getTheme, type Theme } from '../utils/preferences.js';
 import { ComposerLayout } from './components/ComposerLayout.js';
 
 interface CantoComposerProps {
@@ -28,7 +28,7 @@ type Step =
 
 /**
  * Canto Composer - Interactive project configuration tool
- * Stack-agnostic setup wizard 
+ * Stack-agnostic setup wizard
  */
 export function CantoComposer({
   detection,
@@ -203,7 +203,7 @@ export function CantoComposer({
   );
 }
 
-function AnalyzingStep({ theme }: { theme: import('../utils/preferences.js').Theme }): React.JSX.Element {
+function AnalyzingStep({ theme }: { theme: Theme }): React.JSX.Element {
   return (
     <Box flexDirection="column" paddingX={2} paddingY={3} alignItems="center">
       <Box marginBottom={2}>
@@ -218,7 +218,13 @@ function AnalyzingStep({ theme }: { theme: import('../utils/preferences.js').The
   );
 }
 
-function WelcomeStep({ detection, theme }: { detection: ProjectDetectionResult; theme: import('../utils/preferences.js').Theme }): React.JSX.Element {
+function WelcomeStep({
+  detection,
+  theme,
+}: {
+  detection: ProjectDetectionResult;
+  theme: Theme;
+}): React.JSX.Element {
   return (
     <Box flexDirection="column" gap={1}>
       <Box marginBottom={1}>
@@ -287,7 +293,7 @@ function WorkspacesStep({
   theme,
 }: {
   workspaces: ProjectDetectionResult['workspaces'];
-  theme: import('../utils/preferences.js').Theme;
+  theme: Theme;
 }): React.JSX.Element {
   return (
     <Box flexDirection="column" gap={1}>
@@ -314,7 +320,7 @@ function WorkspacesStep({
             <Text bold color={theme.colors.primary}>
               {workspace.name}
             </Text>
-            <Text dimColor> ({workspace.path.split(/[\/\\]/).slice(-2).join('/')})</Text>
+            <Text dimColor> ({workspace.path.split(/[/\\]/).slice(-2).join('/')})</Text>
           </Box>
         ))}
         {workspaces.length > 8 && (
@@ -335,7 +341,13 @@ function WorkspacesStep({
   );
 }
 
-function DockerStep({ docker, theme }: { docker: ProjectDetectionResult['docker']; theme: import('../utils/preferences.js').Theme }): React.JSX.Element {
+function DockerStep({
+  docker,
+  theme,
+}: {
+  docker: ProjectDetectionResult['docker'];
+  theme: Theme;
+}): React.JSX.Element {
   if (docker.composeFiles.length === 0) {
     return (
       <Box flexDirection="column" gap={1}>
@@ -359,7 +371,13 @@ function DockerStep({ docker, theme }: { docker: ProjectDetectionResult['docker'
         </Text>
       </Box>
 
-      <Box flexDirection="column" borderStyle="round" borderColor={theme.colors.info} paddingX={2} paddingY={1}>
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={theme.colors.info}
+        paddingX={2}
+        paddingY={1}
+      >
         <Text bold>Found Docker Compose files:</Text>
         {docker.composeFiles.map((file, idx) => (
           <Box key={file} marginTop={1}>
@@ -384,7 +402,7 @@ function DockerStep({ docker, theme }: { docker: ProjectDetectionResult['docker'
   );
 }
 
-function PrerequisitesStep({ theme }: { theme: import('../utils/preferences.js').Theme }): React.JSX.Element {
+function PrerequisitesStep({ theme }: { theme: Theme }): React.JSX.Element {
   return (
     <Box flexDirection="column" gap={1}>
       <Box marginBottom={1}>
@@ -429,7 +447,7 @@ function PrerequisitesStep({ theme }: { theme: import('../utils/preferences.js')
   );
 }
 
-function PortsStep({ theme }: { theme: import('../utils/preferences.js').Theme }): React.JSX.Element {
+function PortsStep({ theme }: { theme: Theme }): React.JSX.Element {
   return (
     <Box flexDirection="column" gap={1}>
       <Box marginBottom={1}>
@@ -487,7 +505,7 @@ function ConfirmStep({
   includePrerequisites: boolean;
   autoAllocatePorts: boolean;
   detection: ProjectDetectionResult;
-  theme: import('../utils/preferences.js').Theme;
+  theme: Theme;
 }): React.JSX.Element {
   return (
     <Box flexDirection="column" gap={1}>
@@ -498,23 +516,35 @@ function ConfirmStep({
       </Box>
 
       {/* Summary Table */}
-      <Box flexDirection="column" borderStyle="round" borderColor={theme.colors.primary} paddingX={2} paddingY={1}>
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={theme.colors.primary}
+        paddingX={2}
+        paddingY={1}
+      >
         <Box>
-          <Text bold dimColor>Project Type:</Text>
+          <Text bold dimColor>
+            Project Type:
+          </Text>
           <Text> </Text>
           <Text color={theme.colors.primary} bold>
             {detection.projectType.toUpperCase()}
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text bold dimColor>Package Manager:</Text>
+          <Text bold dimColor>
+            Package Manager:
+          </Text>
           <Text> </Text>
           <Text color={theme.colors.warning} bold>
             {detection.packageManager.toUpperCase()}
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text bold dimColor>Workspaces:</Text>
+          <Text bold dimColor>
+            Workspaces:
+          </Text>
           <Text> </Text>
           <Text color={theme.colors.success} bold>
             {selectedWorkspaces.length} modules
@@ -522,11 +552,14 @@ function ConfirmStep({
         </Box>
         {detection.docker.composeFiles.length > 0 && (
           <Box marginTop={1}>
-            <Text bold dimColor>Docker:</Text>
+            <Text bold dimColor>
+              Docker:
+            </Text>
             <Text> </Text>
             {includeDocker ? (
               <Text color={theme.colors.success} bold>
-                ✓ ENABLED ({detection.docker.composeFiles.length} file{detection.docker.composeFiles.length > 1 ? 's' : ''})
+                ✓ ENABLED ({detection.docker.composeFiles.length} file
+                {detection.docker.composeFiles.length > 1 ? 's' : ''})
               </Text>
             ) : (
               <Text color={theme.colors.error} bold>
@@ -536,7 +569,9 @@ function ConfirmStep({
           </Box>
         )}
         <Box marginTop={1}>
-          <Text bold dimColor>Prerequisites:</Text>
+          <Text bold dimColor>
+            Prerequisites:
+          </Text>
           <Text> </Text>
           {includePrerequisites ? (
             <Text color={theme.colors.success} bold>
@@ -549,7 +584,9 @@ function ConfirmStep({
           )}
         </Box>
         <Box marginTop={1}>
-          <Text bold dimColor>Auto Ports:</Text>
+          <Text bold dimColor>
+            Auto Ports:
+          </Text>
           <Text> </Text>
           {autoAllocatePorts ? (
             <Text color={theme.colors.success} bold>

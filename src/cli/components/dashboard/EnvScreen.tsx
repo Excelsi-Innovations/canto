@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import type { ScreenProps } from '../../types.js';
-import { readdirSync, readFileSync, statSync } from 'fs';
+import { readdirSync, readFileSync, statSync, existsSync } from 'fs';
 import { join } from 'path';
+import { diffEnvFiles } from '../../../utils/env-diff.js';
 
 interface EnvFile {
   name: string;
   path: string;
   size: number;
+  isValid: boolean;
+  missingKeys: string[];
 }
 
 export const EnvScreen: React.FC<ScreenProps> = React.memo(({ onBack, onQuit }) => {
@@ -20,13 +23,29 @@ export const EnvScreen: React.FC<ScreenProps> = React.memo(({ onBack, onQuit }) 
   // Load .env files on mount
   useEffect(() => {
     try {
-      const files = readdirSync(process.cwd())
-        .filter((f) => f.startsWith('.env') && statSync(join(process.cwd(), f)).isFile())
-        .map((f) => ({
-          name: f,
-          path: join(process.cwd(), f),
-          size: statSync(join(process.cwd(), f)).size,
-        }));
+      const cwd = process.cwd();
+      const files = readdirSync(cwd)
+        .filter((f) => f.startsWith('.env') && statSync(join(cwd, f)).isFile())
+        .map((f) => {
+          const path = join(cwd, f);
+          const examplePath = join(cwd, '.env.example');
+          let isValid = true;
+          let missingKeys: string[] = [];
+
+          if (existsSync(examplePath)) {
+            const diff = diffEnvFiles(path, examplePath);
+            ({ missingKeys } = diff);
+            isValid = missingKeys.length === 0;
+          }
+
+          return {
+            name: f,
+            path,
+            size: statSync(path).size,
+            isValid,
+            missingKeys,
+          };
+        });
       setEnvFiles(files);
     } catch (err) {
       console.error('Error scanning for env files:', err);
@@ -60,6 +79,7 @@ export const EnvScreen: React.FC<ScreenProps> = React.memo(({ onBack, onQuit }) 
     } else if (key.return) {
       if (envFiles[selectedIndex]) {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           const content = readFileSync(envFiles[selectedIndex]!.path, 'utf-8');
           setViewedFileContent(content);
           setScrollOffset(0);
@@ -93,28 +113,35 @@ export const EnvScreen: React.FC<ScreenProps> = React.memo(({ onBack, onQuit }) 
           {visibleLines.length === 0 ? (
             <Text dimColor>File is empty</Text>
           ) : (
-             visibleLines.map((line, i) => {
-                 // Better parsing: find first equals sign
-                 const eqIndex = line.indexOf('=');
-                 if (eqIndex > 0 && !line.trim().startsWith('#')) {
-                     const key = line.substring(0, eqIndex);
-                     const val = line.substring(eqIndex + 1);
-                     return (
-                        <Text key={i + scrollOffset} wrap="truncate-end">
-                             <Text color="cyan">{key}</Text>
-                             <Text>=</Text>
-                             <Text color="green">{val}</Text>
-                         </Text>
-                     );
-                 }
-                 // Comments or empty lines
-                 return <Text key={i + scrollOffset} dimColor wrap="truncate-end">{line || ' '}</Text>;
-             })
+            visibleLines.map((line, i) => {
+              // Better parsing: find first equals sign
+              const eqIndex = line.indexOf('=');
+              if (eqIndex > 0 && !line.trim().startsWith('#')) {
+                const key = line.substring(0, eqIndex);
+                const val = line.substring(eqIndex + 1);
+                return (
+                  <Text key={i + scrollOffset} wrap="truncate-end">
+                    <Text color="cyan">{key}</Text>
+                    <Text>=</Text>
+                    <Text color="green">{val}</Text>
+                  </Text>
+                );
+              }
+              // Comments or empty lines
+              return (
+                <Text key={i + scrollOffset} dimColor wrap="truncate-end">
+                  {line || ' '}
+                </Text>
+              );
+            })
           )}
         </Box>
         <Box marginTop={0} justifyContent="space-between">
           <Text dimColor>Scroll: ↑↓ • Back: 'b'</Text>
-          <Text dimColor> {Math.min(scrollOffset + MAX_LINES, totalLines)}/{totalLines}</Text>
+          <Text dimColor>
+            {' '}
+            {Math.min(scrollOffset + MAX_LINES, totalLines)}/{totalLines}
+          </Text>
         </Box>
       </Box>
     );
@@ -122,19 +149,20 @@ export const EnvScreen: React.FC<ScreenProps> = React.memo(({ onBack, onQuit }) 
 
   return (
     <Box flexDirection="column" flexGrow={1} padding={1} overflow="hidden" minWidth={0}>
-      <Box borderStyle="double" borderColor="cyan" padding={1} marginBottom={1} overflow="hidden" minWidth={0}>
+      <Box
+        borderStyle="double"
+        borderColor="cyan"
+        padding={1}
+        marginBottom={1}
+        overflow="hidden"
+        minWidth={0}
+      >
         <Text bold color="magenta">
           🔧 ENVIRONMENT VARIABLES
         </Text>
       </Box>
 
-      <Box
-        borderStyle="round"
-        borderColor="gray"
-        padding={1}
-        flexDirection="column"
-        flexGrow={1}
-      >
+      <Box borderStyle="round" borderColor="gray" padding={1} flexDirection="column" flexGrow={1}>
         <Text color="yellow" bold>
           Detected Environment Files:
         </Text>
@@ -143,11 +171,25 @@ export const EnvScreen: React.FC<ScreenProps> = React.memo(({ onBack, onQuit }) 
             <Text dimColor>No .env files found in current directory.</Text>
           ) : (
             envFiles.map((file, index) => (
-              <Box key={file.name}>
+              <Box key={file.name} flexDirection="row">
                 <Text color={index === selectedIndex ? 'magenta' : 'white'}>
                   {index === selectedIndex ? '> ' : '  '}
-                  {file.name}
                 </Text>
+
+                <Box marginRight={1}>
+                  {file.isValid ? <Text color="green">✓</Text> : <Text color="yellow">⚠</Text>}
+                </Box>
+
+                <Text color={index === selectedIndex ? 'magenta' : 'white'}>{file.name}</Text>
+
+                {!file.isValid && (
+                  <Box marginLeft={1}>
+                    <Text dimColor color="yellow">
+                      ({file.missingKeys.length} missing)
+                    </Text>
+                  </Box>
+                )}
+
                 <Box flexGrow={1} />
                 <Text dimColor>{file.size} bytes</Text>
               </Box>
@@ -157,9 +199,7 @@ export const EnvScreen: React.FC<ScreenProps> = React.memo(({ onBack, onQuit }) 
       </Box>
 
       <Box marginTop={1}>
-        <Text dimColor>
-          Use ↑↓ to navigate • Enter to view content • 'b' to back • 'q' to quit
-        </Text>
+        <Text dimColor>Use ↑↓ to navigate • Enter to view content • 'b' to back • 'q' to quit</Text>
       </Box>
     </Box>
   );

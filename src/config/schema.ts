@@ -87,6 +87,10 @@ export const GlobalConfigSchema = z.object({
 export const ConfigSchema = z.object({
   version: z.string().optional().default('1').describe('Config file version'),
   global: GlobalConfigSchema.optional().describe('Global configuration options'),
+  customScripts: z
+    .record(z.string(), z.string())
+    .optional()
+    .describe('Custom scripts accessible in Commander'),
   modules: z.array(ModuleSchema).min(1).describe('List of modules to manage'),
 });
 

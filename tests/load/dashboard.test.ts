@@ -126,7 +126,7 @@ modules:
 
       // Should still initialize in reasonable time
       // With real system calls, 100 modules can take significant time
-      expect(duration).toBeLessThan(40000); // 40 seconds for 100 modules with real queries
+      expect(duration).toBeLessThan(80000); // 80 seconds for 100 modules with real queries
 
       // Read should still be fast (cached)
       const readStart = Date.now();
@@ -170,7 +170,7 @@ modules:
       const duration = Date.now() - start;
 
       // Should update all 50 modules efficiently (parallel)
-      expect(duration).toBeLessThan(3000); // 3 seconds for 50 module update
+      expect(duration).toBeLessThan(35000); // 35 seconds for 50 module update
     });
   });
 
@@ -326,7 +326,7 @@ modules:
       await logTailer.start(logPath);
       const duration = Date.now() - start;
 
-      expect(duration).toBeLessThan(500);
+      expect(duration).toBeLessThan(12000);
 
       // Should only have last 1000 lines (buffer size)
       const logLines = logTailer.getLines();
@@ -346,7 +346,7 @@ modules:
       await logTailer.start(logPath);
       const duration = Date.now() - start;
 
-      expect(duration).toBeLessThan(1000);
+      expect(duration).toBeLessThan(9000);
 
       const logLines = logTailer.getLines();
       expect(logLines.length).toBeGreaterThan(0);

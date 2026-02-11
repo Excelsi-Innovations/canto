@@ -38,7 +38,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
     if (key.backspace || key.delete) {
       setQuery((prev) => prev.slice(0, -1));
-    } else if (input && input.length === 1 && !key.ctrl && !key.meta) {
+    } else if (input?.length === 1 && !key.ctrl && !key.meta) {
       setQuery((prev) => prev + input);
     }
   });
