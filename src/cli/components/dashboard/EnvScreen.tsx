@@ -47,8 +47,8 @@ export const EnvScreen: React.FC<ScreenProps> = React.memo(({ onBack, onQuit }) 
           };
         });
       setEnvFiles(files);
-    } catch (err) {
-      console.error('Error scanning for env files:', err);
+    } catch {
+      // Silently handle env scan errors
     }
   }, []);
 

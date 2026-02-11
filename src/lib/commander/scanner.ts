@@ -17,21 +17,24 @@ export class TaskScanner {
   }
 
   async scan(): Promise<Task[]> {
-    const tasks: Task[] = [];
+    const taskMap = new Map<string, Task>();
 
     // 1. Scan package.json
-    const npmTasks = this.scanPackageJson();
-    tasks.push(...npmTasks);
+    for (const task of this.scanPackageJson()) {
+      taskMap.set(task.id, task);
+    }
 
     // 2. Scan Makefile
-    const makeTasks = this.scanMakefile();
-    tasks.push(...makeTasks);
+    for (const task of this.scanMakefile()) {
+      if (!taskMap.has(task.id)) {
+        taskMap.set(task.id, task);
+      }
+    }
 
     // 3. Scan Justfile (future)
     // const justTasks = this.scanJustfile();
-    // tasks.push(...justTasks);
 
-    return tasks;
+    return Array.from(taskMap.values());
   }
 
   private detectPackageManager(): string {
@@ -59,8 +62,7 @@ export class TaskScanner {
         command: String(command),
         description: `Run ${pm} script: ${name}`,
       }));
-    } catch (err) {
-      console.error('Failed to parse package.json:', err);
+    } catch {
       return [];
     }
   }
@@ -72,14 +74,16 @@ export class TaskScanner {
     try {
       const content = readFileSync(makePath, 'utf-8');
       const tasks: Task[] = [];
+      const seen = new Set<string>();
       const lines = content.split('\n');
 
-      lines.forEach((line) => {
+      for (const line of lines) {
         // Regex to find targets: "target:" or "target: dependencies"
         // Exclude .PHONY and hidden targets
         const match = line.match(/^([a-zA-Z0-9_-]+):/);
-        if (match?.[1] && !match[1].startsWith('.')) {
+        if (match?.[1] && !match[1].startsWith('.') && !seen.has(match[1])) {
           const name = match[1];
+          seen.add(name);
           tasks.push({
             id: `make:${name}`,
             name,
@@ -88,11 +92,10 @@ export class TaskScanner {
             description: `Run make target: ${name}`,
           });
         }
-      });
+      }
 
       return tasks;
-    } catch (err) {
-      console.error('Failed to parse Makefile:', err);
+    } catch {
       return [];
     }
   }

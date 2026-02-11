@@ -132,11 +132,8 @@ export function listContainers(composeFilePath: string): DockerContainer[] {
     // Cache the result
     dockerCache.set(composeFilePath, containers);
     return containers;
-  } catch (error) {
+  } catch {
     // Silently fail if docker is not available or compose file not found
-    if (error instanceof Error) {
-      console.error(pc.dim(`Docker error: ${error.message}`));
-    }
     dockerCache.set(composeFilePath, []);
     return [];
   }

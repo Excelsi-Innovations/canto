@@ -38,8 +38,8 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
           // If persistent, we should check which tasks are actually running in ProcessManager
           // iterate foundTasks, check runner.getStatus
           // We'll skip auto-sync for now to save complexity, or do it on render logic.
-        } catch (error) {
-          console.error(error);
+        } catch {
+          // Silently handle scan errors
         } finally {
           setLoading(false);
         }

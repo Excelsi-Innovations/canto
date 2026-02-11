@@ -476,8 +476,8 @@ export async function dashboardCommand(): Promise<void> {
   try {
     const instance = render(<Dashboard />);
     await instance.waitUntilExit();
-  } catch (err) {
-    console.error('Dashboard error:', err);
+  } catch {
+    // Dashboard exited with error — cleanup handles it
   } finally {
     cleanup();
     // Force exit after 100ms if cleanup is slow

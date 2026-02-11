@@ -6,6 +6,7 @@ import type { ProcessManager } from '../../processes/manager.js';
 import type { ModuleOrchestrator } from '../../modules/index.js';
 import type { DockerExecutor } from '../../modules/docker.js';
 import type { ModuleStatus } from '../types.js';
+import { isDockerAvailable } from '../../utils/docker.js';
 import { getProcessResources } from '../../utils/resources.js';
 
 export type ModuleStatusSubscriber = (modules: ModuleStatus[]) => void;
@@ -34,6 +35,7 @@ export class DashboardDataManager {
   private updateTimer: NodeJS.Timeout | null = null;
   private dirtyModules: Set<string> = new Set();
   private isInitialized: boolean = false;
+  private dockerAvailable: boolean = false;
   private configChangeDebounceTimer: NodeJS.Timeout | null = null;
 
   constructor(
@@ -62,6 +64,9 @@ export class DashboardDataManager {
     if (this.isInitialized) {
       return;
     }
+
+    // Check Docker availability once at startup
+    this.dockerAvailable = isDockerAvailable();
 
     // Load config once on startup
     await this.loadInitialConfig();
@@ -310,27 +315,32 @@ export class DashboardDataManager {
 
       // Get Docker containers if it's a Docker module
       if (module.type === 'docker') {
-        try {
-          const services = this.dockerExecutor.getServices(module);
-          moduleStatus.containers = services
-            .filter(
-              (s): s is typeof s & { container: NonNullable<typeof s.container> } => !!s.container
-            )
-            .map((s) => {
-              const { container } = s;
-              return {
-                name: container.name,
-                status: container.status,
-                ports: container.ports
-                  .map((p) => {
-                    const match = p.match(/(?:[\d.]+:)?(\d+)->/);
-                    return match ? `:${match[1]}` : '';
-                  })
-                  .filter(Boolean),
-              };
-            });
-        } catch {
-          // Ignore Docker errors
+        if (!this.dockerAvailable) {
+          // Docker not running — skip polling, show clear status
+          moduleStatus.status = 'STOPPED';
+        } else {
+          try {
+            const services = this.dockerExecutor.getServices(module);
+            moduleStatus.containers = services
+              .filter(
+                (s): s is typeof s & { container: NonNullable<typeof s.container> } => !!s.container
+              )
+              .map((s) => {
+                const { container } = s;
+                return {
+                  name: container.name,
+                  status: container.status,
+                  ports: container.ports
+                    .map((p) => {
+                      const match = p.match(/(?:[\d.]+:)?(\d+)->/);
+                      return match ? `:${match[1]}` : '';
+                    })
+                    .filter(Boolean),
+                };
+              });
+          } catch {
+            // Ignore Docker errors
+          }
         }
       }
 
