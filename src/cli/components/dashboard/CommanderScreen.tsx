@@ -26,8 +26,8 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
     // Get terminal height for viewport sizing
     const { stdout } = useStdout();
     const termHeight = stdout?.rows ?? 40;
-    // Reserve space for header, borders, filter bar, footer
-    const visibleTaskCount = Math.max(5, termHeight - 12);
+    // Reserve space for header, borders, filter bar, footer — cap at 16
+    const visibleTaskCount = Math.min(16, Math.max(5, termHeight - 12));
 
     // Use refs to persist scanner/runner across renders if needed,
     // but useMemo is sufficient for component lifecycle.

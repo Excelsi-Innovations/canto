@@ -6,7 +6,7 @@ import type { ProcessManager } from '../../processes/manager.js';
 import type { ModuleOrchestrator } from '../../modules/index.js';
 import type { DockerExecutor } from '../../modules/docker.js';
 import type { ModuleStatus } from '../types.js';
-import { isDockerAvailable } from '../../utils/docker.js';
+import { isDockerRunning } from '../../utils/docker.js';
 import { getProcessResources } from '../../utils/resources.js';
 
 export type ModuleStatusSubscriber = (modules: ModuleStatus[]) => void;
@@ -65,8 +65,8 @@ export class DashboardDataManager {
       return;
     }
 
-    // Check Docker availability once at startup
-    this.dockerAvailable = isDockerAvailable();
+    // Check Docker daemon is running (not just CLI installed)
+    this.dockerAvailable = isDockerRunning();
 
     // Load config once on startup
     await this.loadInitialConfig();

@@ -44,11 +44,24 @@ export function detectDockerCompose(): DockerComposeCommand {
 }
 
 /**
- * Check if Docker is available on the system
+ * Check if Docker CLI is installed on the system
  */
 export function isDockerAvailable(): boolean {
   try {
     execSync('docker --version', { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if Docker daemon is actually running (not just CLI installed)
+ * This prevents error spam when Docker Desktop is not started.
+ */
+export function isDockerRunning(): boolean {
+  try {
+    execSync('docker info', { stdio: 'ignore', timeout: 3000 });
     return true;
   } catch {
     return false;
