@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useStdout } from 'ink';
 import type { ScreenProps } from '../../types.js';
 import type { Theme } from '../../../utils/preferences.js';
 import { TaskScanner, type Task } from '../../../lib/commander/scanner.js';
@@ -21,6 +21,13 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
     const [outputLines, setOutputLines] = useState<string[]>([]);
     const [scrollOffset, setScrollOffset] = useState(0);
     const [filter, setFilter] = useState('');
+    const [taskListOffset, setTaskListOffset] = useState(0);
+
+    // Get terminal height for viewport sizing
+    const { stdout } = useStdout();
+    const termHeight = stdout?.rows ?? 40;
+    // Reserve space for header, borders, filter bar, footer
+    const visibleTaskCount = Math.max(5, termHeight - 12);
 
     // Use refs to persist scanner/runner across renders if needed,
     // but useMemo is sufficient for component lifecycle.
@@ -50,6 +57,12 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
     const filteredTasks = useMemo(() => {
       return tasks.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()));
     }, [tasks, filter]);
+
+    // Reset viewport when filter changes
+    useEffect(() => {
+      setSelectedIndex(0);
+      setTaskListOffset(0);
+    }, [filter]);
 
     // Subscription Effect
     useEffect(() => {
@@ -104,11 +117,21 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
       }
 
       if (key.upArrow) {
-        setSelectedIndex(Math.max(0, selectedIndex - 1));
+        const newIndex = Math.max(0, selectedIndex - 1);
+        setSelectedIndex(newIndex);
+        // Scroll viewport up if cursor goes above visible area
+        if (newIndex < taskListOffset) {
+          setTaskListOffset(newIndex);
+        }
       }
 
       if (key.downArrow) {
-        setSelectedIndex(Math.min(filteredTasks.length - 1, selectedIndex + 1));
+        const newIndex = Math.min(filteredTasks.length - 1, selectedIndex + 1);
+        setSelectedIndex(newIndex);
+        // Scroll viewport down if cursor goes below visible area
+        if (newIndex >= taskListOffset + visibleTaskCount) {
+          setTaskListOffset(newIndex - visibleTaskCount + 1);
+        }
       }
 
       const selectedTask = filteredTasks[selectedIndex];
@@ -206,26 +229,35 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
                 {filteredTasks.length === 0 ? (
                   <Text dimColor>No tasks found.</Text>
                 ) : (
-                  filteredTasks.map((task, index) => {
-                    const isRunning = runningTasks.has(task.id);
-                    return (
-                      <Box key={task.id} flexDirection="row">
-                        <Text
-                          color={
-                            index === selectedIndex ? theme.colors.highlight : theme.colors.primary
-                          }
-                        >
-                          {index === selectedIndex ? '> ' : '  '}
-                        </Text>
-                        <Text color={isRunning ? theme.colors.success : theme.colors.muted}>
-                          {isRunning ? '● ' : '○ '}
-                        </Text>
-                        <Text color={index === selectedIndex ? theme.colors.highlight : 'white'}>
-                          {task.name.slice(0, 20)}
-                        </Text>
-                      </Box>
-                    );
-                  })
+                  <>
+                    {taskListOffset > 0 && (
+                      <Text dimColor>  ▲ {taskListOffset} more above</Text>
+                    )}
+                    {filteredTasks.slice(taskListOffset, taskListOffset + visibleTaskCount).map((task, i) => {
+                      const index = taskListOffset + i;
+                      const isRunning = runningTasks.has(task.id);
+                      return (
+                        <Box key={task.id} flexDirection="row">
+                          <Text
+                            color={
+                              index === selectedIndex ? theme.colors.highlight : theme.colors.primary
+                            }
+                          >
+                            {index === selectedIndex ? '> ' : '  '}
+                          </Text>
+                          <Text color={isRunning ? theme.colors.success : theme.colors.muted}>
+                            {isRunning ? '● ' : '○ '}
+                          </Text>
+                          <Text color={index === selectedIndex ? theme.colors.highlight : 'white'}>
+                            {task.name.slice(0, 24)}
+                          </Text>
+                        </Box>
+                      );
+                    })}
+                    {taskListOffset + visibleTaskCount < filteredTasks.length && (
+                      <Text dimColor>  ▼ {filteredTasks.length - taskListOffset - visibleTaskCount} more below</Text>
+                    )}
+                  </>
                 )}
               </Box>
             </Box>
