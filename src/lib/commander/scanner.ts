@@ -55,11 +55,11 @@ export class TaskScanner {
       const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
       if (!pkg.scripts) return [];
 
-      return Object.entries(pkg.scripts).map(([name, command]) => ({
+      return Object.entries(pkg.scripts).map(([name]) => ({
         id: `${pm}:${name}`,
         name,
         source: pm as Task['source'],
-        command: String(command),
+        command: `${pm} run ${name}`,
         description: `Run ${pm} script: ${name}`,
       }));
     } catch {
