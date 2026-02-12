@@ -35,7 +35,11 @@ describe('DependencyManager Integration', () => {
       name: 'module-a',
       path: join(TEST_DIR, 'module-a'),
       type: 'workspace',
-      packageManager: 'npm'
+      type: 'workspace',
+      packageManager: 'npm',
+      enabled: true,
+      dependsOn: [],
+      run: {}
     };
 
     // Mock ProcessManager spawn to avoid actual install

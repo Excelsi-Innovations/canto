@@ -113,6 +113,13 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({ stats, selectedScre
           theme={theme}
         />
         <NavItem
+          label="Database"
+          icon="🗄️"
+          hotkey="M"
+          isActive={selectedScreen === 'migrations'}
+          theme={theme}
+        />
+        <NavItem
           label="Environment"
           icon="⚙️"
           hotkey="E"
@@ -164,6 +171,12 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({ stats, selectedScre
               Enter
             </Text>{' '}
             Details
+          </Text>
+          <Text color={theme.colors.muted}>
+            <Text color={theme.colors.primary} bold>
+              M
+            </Text>{' '}
+            Database
           </Text>
           <Text color={theme.colors.muted}>
             <Text color={theme.colors.error} bold>

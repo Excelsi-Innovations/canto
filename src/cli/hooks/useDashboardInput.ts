@@ -258,7 +258,7 @@ export function useDashboardInput({
             triggerUpdate();
           }
         } else if (input === 'm' || input === 'M') {
-          setScreen('modules');
+          setScreen('migrations');
         } else if (input === 'e' || input === 'E') {
           setScreen('env');
         } else if (input === 'l' || input === 'L') {

@@ -1,113 +1,66 @@
+import { stringify } from 'yaml';
 import type { Config, Module } from '../config/schema.js';
-import type { DetectedWorkspace, DetectedDocker, PackageManager } from './detector.js';
-
-export interface TemplateOptions {
-  workspaces: DetectedWorkspace[];
-  docker: DetectedDocker;
-  packageManager: PackageManager;
-  includePrerequisites: boolean;
-  autoAllocatePorts: boolean;
-}
+import type { ComposerState } from './composer-state.js';
 
 /**
- * Generate a workspace module configuration
- *
- * @param workspace - Detected workspace information
- * @returns Module configuration
+ * Generate configuration from Composer state
  */
-function generateWorkspaceModule(workspace: DetectedWorkspace): Module {
-  const commands: Record<string, string> = {};
-
-  if (workspace.hasDevScript) {
-    commands['dev'] = 'npm run dev';
-  }
-  if (workspace.hasBuildScript) {
-    commands['build'] = 'npm run build';
-  }
-  if (workspace.hasTestScript) {
-    commands['test'] = 'npm run test';
-  }
-
-  // If no commands available, skip this workspace
-  if (Object.keys(commands).length === 0) {
-    commands['build'] = 'npm run build'; // Default fallback
-  }
-
-  return {
-    name: workspace.name,
-    type: 'workspace',
-    path: workspace.path,
-    run: commands as { dev?: string; build?: string; test?: string; start?: string },
-    packageManager: workspace.packageManager,
-    enabled: true,
-    dependsOn: [],
-  };
-}
-
-/**
- * Generate a Docker module configuration
- *
- * @param composeFile - Docker Compose file path
- * @param name - Module name
- * @returns Module configuration
- */
-function generateDockerModule(composeFile: string, name = 'infra'): Module {
-  return {
-    name,
-    type: 'docker',
-    composeFile,
-    enabled: true,
-    dependsOn: [],
-  };
-}
-
-/**
- * Generate complete configuration from detection results
- *
- * @param options - Template options
- * @returns Complete configuration object
- */
-export function generateConfig(options: TemplateOptions): Config {
+export function generateConfig(state: ComposerState): Config {
   const modules: Module[] = [];
 
-  // Add Docker modules first (infrastructure dependencies)
-  if (options.docker.composeFiles.length > 0) {
-    // Use the first compose file found
-    const composeFile = options.docker.composeFiles[0];
-    if (composeFile) {
-      const dockerModule = generateDockerModule(composeFile);
-      modules.push(dockerModule);
+  // 1. Add all enabled modules
+  for (const mod of state.modules) {
+    if (!mod.enabled) continue;
+
+    if (mod.type === 'docker') {
+      modules.push({
+        name: mod.name,
+        type: 'docker',
+        composeFile: mod.path,
+        enabled: true,
+        dependsOn: [],
+        // services? profiles? - To be enhanced in V2
+        // For now, simple compose file reference
+      });
+    } else {
+      // workspace or worker
+      const moduleConfig: Module = {
+        name: mod.name,
+        type: 'workspace', // schema only supports 'workspace' | 'docker' | 'custom'
+        path: mod.path,
+        run: mod.commands,
+        enabled: true,
+        dependsOn: mod.dependsOn,
+        packageManager: 'auto',
+      };
+
+      modules.push(moduleConfig);
     }
   }
 
-  // Add workspace modules
-  for (const workspace of options.workspaces) {
-    const workspaceModule = generateWorkspaceModule(workspace);
-
-    // If there's a docker module, make workspaces depend on it
-    if (modules.length > 0 && modules[0]?.type === 'docker') {
-      workspaceModule.dependsOn = [modules[0].name];
+  const customScripts: Record<string, string> = {};
+  for (const [name, enabled] of Object.entries(state.customScripts)) {
+    if (enabled) {
+      customScripts[name] = state.rootScripts[name] ?? '';
     }
-
-    modules.push(workspaceModule);
   }
 
   const config: Config = {
     version: '1',
     global: {
       logsDir: './tmp',
-      autoAllocatePorts: options.autoAllocatePorts,
+      autoAllocatePorts: true, // Defaulting to true for now
+      prerequisites: {
+        node: state.nodeVersion,
+        docker: state.requireDocker,
+        dockerCompose: state.requireDockerCompose,
+      },
     },
     modules,
   };
 
-  // Add prerequisites if requested
-  if (options.includePrerequisites && config.global) {
-    config.global.prerequisites = {
-      docker: options.docker.composeFiles.length > 0 || options.docker.hasDockerfile,
-      dockerCompose: options.docker.composeFiles.length > 0,
-      node: '>=18.0.0',
-    };
+  if (Object.keys(customScripts).length > 0) {
+    config.customScripts = customScripts;
   }
 
   return config;
@@ -115,134 +68,22 @@ export function generateConfig(options: TemplateOptions): Config {
 
 /**
  * Generate YAML string from configuration
- *
- * @param config - Configuration object
- * @returns YAML string
  */
 export function configToYaml(config: Config): string {
-  const lines: string[] = [];
+  // Use yaml library to stringify
+  // We want a clean output, maybe some comments?
+  // yaml lib doesn't support comments easily during stringify.
+  // We can add a header manually.
 
-  lines.push('# Canto Development Configuration');
-  lines.push('# Generated by canto init');
-  lines.push('');
+  const yaml = stringify(config, {
+    indent: 2,
+    lineWidth: 0, // Disable line wrapping
+    aliasDuplicateObjects: false,
+  });
 
-  lines.push(`version: "${config.version}"`);
-  lines.push('');
+  return `# Canto Development Configuration
+# Generated by Canto Composer
+# https://github.com/Excelsi-Innovations/canto
 
-  if (config.global) {
-    lines.push('global:');
-    lines.push(`  logsDir: ${config.global.logsDir}`);
-    lines.push(`  autoAllocatePorts: ${config.global.autoAllocatePorts}`);
-
-    if (config.global.prerequisites) {
-      lines.push('  prerequisites:');
-      if (config.global.prerequisites.docker !== undefined) {
-        lines.push(`    docker: ${config.global.prerequisites.docker}`);
-      }
-      if (config.global.prerequisites.dockerCompose !== undefined) {
-        lines.push(`    dockerCompose: ${config.global.prerequisites.dockerCompose}`);
-      }
-      if (config.global.prerequisites.node) {
-        lines.push(`    node: "${config.global.prerequisites.node}"`);
-      }
-    }
-
-    lines.push('');
-  }
-
-  lines.push('modules:');
-
-  for (const module of config.modules) {
-    // Escape names with special characters (like @scoped packages)
-    const safeName =
-      module.name.includes('@') || module.name.includes(':') || module.name.includes('#')
-        ? `"${module.name}"`
-        : module.name;
-    lines.push(`  - name: ${safeName}`);
-    lines.push(`    type: ${module.type}`);
-
-    switch (module.type) {
-      case 'workspace': {
-        lines.push(`    path: ${module.path}`);
-        // Only add run: if there are commands
-        const hasCommands =
-          module.run.dev ?? module.run.build ?? module.run.test ?? module.run.start;
-        if (hasCommands) {
-          lines.push('    run:');
-          if (module.run.dev) {
-            lines.push(`      dev: ${module.run.dev}`);
-          }
-          if (module.run.build) {
-            lines.push(`      build: ${module.run.build}`);
-          }
-          if (module.run.test) {
-            lines.push(`      test: ${module.run.test}`);
-          }
-          if (module.run.start) {
-            lines.push(`      start: ${module.run.start}`);
-          }
-        }
-        if (module.packageManager && module.packageManager !== 'auto') {
-          lines.push(`    packageManager: ${module.packageManager}`);
-        }
-        break;
-      }
-
-      case 'docker':
-        lines.push(`    composeFile: ${module.composeFile}`);
-        if (module.services && module.services.length > 0) {
-          lines.push(`    services:`);
-          for (const service of module.services) {
-            lines.push(`      - ${service}`);
-          }
-        }
-        if (module.profiles && module.profiles.length > 0) {
-          lines.push(`    profiles:`);
-          for (const profile of module.profiles) {
-            lines.push(`      - ${profile}`);
-          }
-        }
-        break;
-
-      case 'custom':
-        lines.push(`    command: ${module.command}`);
-        if (module.cwd) {
-          lines.push(`    cwd: ${module.cwd}`);
-        }
-        break;
-    }
-
-    if (module.dependsOn && module.dependsOn.length > 0) {
-      lines.push('    dependsOn:');
-      for (const dep of module.dependsOn) {
-        const safeDep =
-          dep.includes('@') || dep.includes(':') || dep.includes('#') ? `"${dep}"` : dep;
-        lines.push(`      - ${safeDep}`);
-      }
-    }
-
-    lines.push(`    enabled: ${module.enabled}`);
-
-    if (module.env && Object.keys(module.env).length > 0) {
-      lines.push('    env:');
-      for (const [key, value] of Object.entries(module.env)) {
-        lines.push(`      ${key}: ${value}`);
-      }
-    }
-
-    lines.push('');
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * Generate suggested module names based on path
- *
- * @param path - Workspace path
- * @returns Suggested module name
- */
-export function suggestModuleName(path: string): string {
-  const parts = path.split(/[/\\]/);
-  return parts[parts.length - 1] ?? 'module';
+${yaml}`;
 }

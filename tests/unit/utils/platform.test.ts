@@ -3,6 +3,7 @@ import {
   isWindows,
   isMacOS,
   isLinux,
+  isLinux,
   getPlatformCommand,
   getShell,
   getPathSeparator,
@@ -11,13 +12,13 @@ import {
   supports256Colors,
   getRenderingHints,
   Platform,
-} from 'src/utils/platform';
+} from '../../../src/utils/platform.js';
 import { execSync } from 'node:child_process';
-import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 
 // Mock node:child_process to prevent actual command execution
-jest.mock('node:child_process', () => ({
-  execSync: jest.fn(),
+mock.module('node:child_process', () => ({
+  execSync: mock(),
 }));
 
 describe('platform utilities', () => {
@@ -26,8 +27,8 @@ describe('platform utilities', () => {
 
   beforeEach(() => {
     // Reset mocks before each test
-    (execSync as jest.Mock).mockClear();
-    jest.resetModules(); // This is crucial to re-import the module under test after changing process.platform
+    (execSync as any).mockClear();
+    // jest.resetModules() is not needed as the module is stateless and we are mocking process manually
   });
 
   afterEach(() => {

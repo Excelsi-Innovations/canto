@@ -25,7 +25,8 @@ export type Screen =
   | 'help'
   | 'history'
   | 'details'
-  | 'commander';
+  | 'commander'
+  | 'migrations';
 
 export interface ScreenProps {
   onBack: () => void;

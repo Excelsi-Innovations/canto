@@ -230,32 +230,39 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
                   <Text dimColor>No tasks found.</Text>
                 ) : (
                   <>
-                    {taskListOffset > 0 && (
-                      <Text dimColor>  ▲ {taskListOffset} more above</Text>
-                    )}
-                    {filteredTasks.slice(taskListOffset, taskListOffset + visibleTaskCount).map((task, i) => {
-                      const index = taskListOffset + i;
-                      const isRunning = runningTasks.has(task.id);
-                      return (
-                        <Box key={task.id} flexDirection="row">
-                          <Text
-                            color={
-                              index === selectedIndex ? theme.colors.highlight : theme.colors.primary
-                            }
-                          >
-                            {index === selectedIndex ? '> ' : '  '}
-                          </Text>
-                          <Text color={isRunning ? theme.colors.success : theme.colors.muted}>
-                            {isRunning ? '● ' : '○ '}
-                          </Text>
-                          <Text color={index === selectedIndex ? theme.colors.highlight : 'white'}>
-                            {task.name.slice(0, 24)}
-                          </Text>
-                        </Box>
-                      );
-                    })}
+                    {taskListOffset > 0 && <Text dimColor> ▲ {taskListOffset} more above</Text>}
+                    {filteredTasks
+                      .slice(taskListOffset, taskListOffset + visibleTaskCount)
+                      .map((task, i) => {
+                        const index = taskListOffset + i;
+                        const isRunning = runningTasks.has(task.id);
+                        return (
+                          <Box key={task.id} flexDirection="row">
+                            <Text
+                              color={
+                                index === selectedIndex
+                                  ? theme.colors.highlight
+                                  : theme.colors.primary
+                              }
+                            >
+                              {index === selectedIndex ? '> ' : '  '}
+                            </Text>
+                            <Text color={isRunning ? theme.colors.success : theme.colors.muted}>
+                              {isRunning ? '● ' : '○ '}
+                            </Text>
+                            <Text
+                              color={index === selectedIndex ? theme.colors.highlight : 'white'}
+                            >
+                              {task.name.slice(0, 24)}
+                            </Text>
+                          </Box>
+                        );
+                      })}
                     {taskListOffset + visibleTaskCount < filteredTasks.length && (
-                      <Text dimColor>  ▼ {filteredTasks.length - taskListOffset - visibleTaskCount} more below</Text>
+                      <Text dimColor>
+                        {' '}
+                        ▼ {filteredTasks.length - taskListOffset - visibleTaskCount} more below
+                      </Text>
                     )}
                   </>
                 )}

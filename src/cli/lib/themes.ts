@@ -16,7 +16,9 @@ export interface Theme {
     border: string;
     headerBorder: string;
     textDim: string;
-    background?: string;
+    background: string;
+    muted: string;
+    highlight: string;
   };
 }
 
@@ -33,6 +35,9 @@ export const themes: Record<ThemeName, Theme> = {
       border: 'gray',
       headerBorder: 'cyan',
       textDim: 'gray',
+      background: 'black',
+      muted: 'gray',
+      highlight: '#333',
     },
   },
   light: {
@@ -47,6 +52,9 @@ export const themes: Record<ThemeName, Theme> = {
       border: 'white',
       headerBorder: 'blue',
       textDim: 'gray',
+      background: 'white',
+      muted: 'gray',
+      highlight: '#eee',
     },
   },
   ocean: {
@@ -61,6 +69,9 @@ export const themes: Record<ThemeName, Theme> = {
       border: 'blue',
       headerBorder: 'cyan',
       textDim: 'blue',
+      background: '#001',
+      muted: '#004',
+      highlight: '#003',
     },
   },
   forest: {
@@ -75,6 +86,9 @@ export const themes: Record<ThemeName, Theme> = {
       border: 'green',
       headerBorder: 'green',
       textDim: 'green',
+      background: '#010',
+      muted: '#030',
+      highlight: '#020',
     },
   },
   sunset: {
@@ -89,10 +103,27 @@ export const themes: Record<ThemeName, Theme> = {
       border: 'yellow',
       headerBorder: 'magenta',
       textDim: 'yellow',
+      background: '#300',
+      muted: '#500',
+      highlight: '#400',
     },
   },
 };
 
 export function getTheme(name: ThemeName): Theme {
   return themes[name] || themes.dark;
+}
+
+import { loadPreferences } from '../../utils/preferences.js';
+
+export function useTheme(): Theme {
+  // Simple hook to get current theme based on preferences
+  // Since we don't have a context or listener for init command specifically,
+  // we just read once. If dynamic updates are needed, we'd need a context.
+  try {
+    const prefs = loadPreferences();
+    return getTheme(prefs.theme as ThemeName);
+  } catch {
+    return themes.dark;
+  }
 }

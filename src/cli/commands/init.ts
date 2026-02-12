@@ -5,6 +5,7 @@ import React from 'react';
 import { detectProject } from '../../init/detector.js';
 import { generateConfig, configToYaml } from '../../init/templates.js';
 import { CantoComposer } from '../../init/composer.js';
+import { initState } from '../../init/composer-state.js';
 import { icons, colors } from '../utils/display.js';
 import { errorBox, successBox } from '../utils/format.js';
 
@@ -21,7 +22,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
   try {
     const configPath = join(process.cwd(), 'dev.config.yaml');
 
-    // Check if config already exists
+    // Check if config alreadyists
     if (existsSync(configPath) && !options.force) {
       console.log(
         errorBox(
@@ -60,13 +61,9 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
     // Skip wizard if --yes flag is provided
     if (options.yes) {
-      const config = generateConfig({
-        workspaces: detection.workspaces,
-        docker: detection.docker,
-        packageManager: detection.packageManager,
-        includePrerequisites: true,
-        autoAllocatePorts: true,
-      });
+      // Create a default state from detection and generate config
+      const defaultState = initState(detection);
+      const config = generateConfig(defaultState);
 
       const yaml = configToYaml(config);
       writeFileSync(configPath, yaml, 'utf-8');
@@ -87,22 +84,17 @@ export async function initCommand(options: InitOptions): Promise<void> {
     }
 
     // Launch interactive wizard
+    // Enter alternate screen buffer for full-screen experience
+    process.stdout.write('\x1b[?1049h');
+
     const { waitUntilExit } = render(
       React.createElement(CantoComposer, {
         detection,
-        onComplete: (wizardOptions) => {
-          const config = generateConfig({
-            workspaces: detection.workspaces.filter((w) =>
-              wizardOptions.selectedWorkspaces.includes(w.name)
-            ),
-            docker: wizardOptions.includeDocker
-              ? detection.docker
-              : { composeFiles: [], hasDockerfile: false },
-            packageManager: detection.packageManager,
-            includePrerequisites: wizardOptions.includePrerequisites,
-            autoAllocatePorts: wizardOptions.autoAllocatePorts,
-          });
+        onComplete: (state) => {
+          // Leave alternate screen buffer before showing success
+          process.stdout.write('\x1b[?1049l');
 
+          const config = generateConfig(state);
           const yaml = configToYaml(config);
           writeFileSync(configPath, yaml, 'utf-8');
 
@@ -117,12 +109,20 @@ export async function initCommand(options: InitOptions): Promise<void> {
           );
 
           // Auto-launch dashboard after successful init
+          // We need a short delay to let the UI cleanup
           setTimeout(async () => {
-            const { dashboardCommand } = await import('./dashboard.js');
-            await dashboardCommand();
-          }, 500);
+            try {
+              const { dashboardCommand } = await import('./dashboard.js');
+              await dashboardCommand();
+            } catch (e) {
+              console.error(e);
+              process.exit(1);
+            }
+          }, 800);
         },
         onCancel: () => {
+          // Leave alternate screen buffer
+          process.stdout.write('\x1b[?1049l');
           console.log(`\n${colors.yellow(`${icons.info} Initialization cancelled`)}\n`);
           process.exit(0);
         },
