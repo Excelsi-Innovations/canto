@@ -384,7 +384,7 @@ For full licensing details, see:
 - [LICENSE-MIT](./LICENSE-MIT) - Open source terms
 - [LICENSE-COMMERCIAL](./LICENSE-COMMERCIAL) - Commercial terms
 
-Copyright (c) 2024 Thiago Santos / Excelsi
+Copyright (c) 2026 Thiago Santos / Excelsi
 
 ## 🙏 Acknowledgments
 
