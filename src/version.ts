@@ -1,2 +1,9 @@
-export const VERSION = '1.0';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8'));
+
+export const VERSION = pkg.version;
 export const version = VERSION;

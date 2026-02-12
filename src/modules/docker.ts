@@ -2,7 +2,9 @@ import type { ProcessManager } from '../processes/manager.js';
 import type { DockerModule } from '../config/schema.js';
 import type { ProcessResult } from '../processes/types.js';
 import { execSync } from 'child_process';
-import { resolve, dirname } from 'path';
+import { resolve, dirname, join } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import dotenv from 'dotenv';
 import {
   detectDockerCompose,
   listContainers,
@@ -39,6 +41,31 @@ export class DockerExecutor {
     const services = config.services?.join(' ') ?? '';
     const profiles = config.profiles?.map((p) => `--profile ${p}`).join(' ') ?? '';
 
+    // Load .env from project root if it exists
+    let envVars: Record<string, string | undefined> = { ...process.env };
+    const rootEnvPath = join(process.cwd(), '.env');
+
+    if (existsSync(rootEnvPath)) {
+      const rootEnv = dotenv.parse(readFileSync(rootEnvPath));
+      // dotenv.parse returns string values, safe to merge
+      envVars = { ...envVars, ...rootEnv };
+    }
+
+    // Merge with config.env
+    if (config.env) {
+      // Force cast config.env values to string | undefined to satisfy the type
+      const configEnv = config.env as Record<string, unknown>;
+      const safeConfigEnv: Record<string, string | undefined> = {};
+      for (const [key, val] of Object.entries(configEnv)) {
+        if (typeof val === 'string' || val === undefined) {
+          safeConfigEnv[key] = val;
+        } else {
+          safeConfigEnv[key] = String(val);
+        }
+      }
+      envVars = { ...envVars, ...safeConfigEnv };
+    }
+
     const command =
       `${this.composeCommand} -f ${composeFilePath} ${profiles} up ${services}`.trim();
 
@@ -46,7 +73,8 @@ export class DockerExecutor {
       id,
       command,
       cwd,
-      env: config.env as Record<string, string> | undefined,
+      env: envVars as Record<string, string>,
+      logFile: join(process.cwd(), 'tmp', 'logs', `${id}.log`),
     });
   }
 

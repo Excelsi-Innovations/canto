@@ -165,6 +165,8 @@ export function ModuleSelector({
   });
 
   // Render logic
+  const selectedItem = items[selectedIndex];
+  const currentCategory = selectedItem?.category as WorkspaceCategory | 'utility';
   const visibleList = items.slice(scrollOffset, scrollOffset + VISIBLE_Items);
 
   return (
@@ -187,51 +189,63 @@ export function ModuleSelector({
         </Text>
       </Box>
 
-      <Box flexDirection="column" borderStyle="round" borderColor={theme.colors.border} padding={1}>
+      {/* Sticky Header */}
+      <Box
+        marginBottom={0}
+        paddingX={1}
+        borderStyle="single"
+        borderBottom={false}
+        borderColor={theme.colors.border}
+      >
+        <Text bold color={theme.colors.primary}>
+          {currentCategory ? CATEGORY_LABELS[currentCategory] : 'Select a module'}
+        </Text>
+      </Box>
+
+      {/* Fixed Height List */}
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={theme.colors.border}
+        paddingX={1}
+        height={VISIBLE_Items + 2}
+      >
         {visibleList.map((item, index) => {
           const absoluteIndex = scrollOffset + index;
           const isSelected = absoluteIndex === selectedIndex;
 
-          // Determine if we need a header
-          const prevItem = items[absoluteIndex - 1];
-          const showHeader = prevItem?.category !== item.category;
-
           return (
-            <Box key={`${item.type}-${item.id}`} flexDirection="column">
-              {showHeader && (
-                <Box marginTop={index === 0 ? 0 : 1} marginBottom={0}>
-                  <Text bold underline color={theme.colors.primary}>
-                    {CATEGORY_LABELS[item.category as WorkspaceCategory | 'utility']}
-                  </Text>
-                </Box>
-              )}
+            <Box key={`${item.type}-${item.id}`} flexDirection="row" justifyContent="space-between">
+              <Box>
+                <Text color={isSelected ? theme.colors.primary : undefined}>
+                  {isSelected ? '> ' : '  '}
+                </Text>
+                <Text color={item.selected ? theme.colors.success : theme.colors.muted}>
+                  {item.selected ? '[x] ' : '[ ] '}
+                </Text>
+                <Text color={isSelected ? theme.colors.primary : undefined}>{item.label}</Text>
+              </Box>
 
-              <Box flexDirection="row" justifyContent="space-between">
-                <Box>
-                  <Text color={isSelected ? theme.colors.primary : undefined}>
-                    {isSelected ? '> ' : '  '}
-                  </Text>
-                  <Text color={item.selected ? theme.colors.success : theme.colors.muted}>
-                    {item.selected ? '[x] ' : '[ ] '}
-                  </Text>
-                  <Text color={isSelected ? theme.colors.primary : undefined}>{item.label}</Text>
-                </Box>
-
-                <Box marginLeft={2}>
-                  <Text color={theme.colors.muted} dimColor>
-                    {item.detail}
-                  </Text>
-                </Box>
+              <Box marginLeft={2}>
+                <Text color={theme.colors.muted}>{item.detail}</Text>
               </Box>
             </Box>
           );
         })}
 
         {items.length === 0 && <Text color={theme.colors.warning}>No modules detected.</Text>}
+
+        {/* Filler to maintain height if list is short */}
+        {visibleList.length < VISIBLE_Items &&
+          Array.from({ length: VISIBLE_Items - visibleList.length }).map((_, i) => (
+            <Box key={`filler-${i}`}>
+              <Text> </Text>
+            </Box>
+          ))}
       </Box>
 
       <Box marginTop={0} justifyContent="flex-end">
-        <Text color={theme.colors.muted} dimColor>
+        <Text color={theme.colors.muted}>
           {items.length > VISIBLE_Items
             ? `${scrollOffset + 1}-${Math.min(items.length, scrollOffset + VISIBLE_Items)} of ${items.length}`
             : ''}

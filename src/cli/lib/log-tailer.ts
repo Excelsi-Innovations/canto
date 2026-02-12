@@ -15,6 +15,7 @@ export class LogTailer {
   private fileWatcher: FSWatcher | null = null;
   private lastPosition: number = 0;
   private subscribers: Set<LogSubscriber> = new Set();
+  private isStopped: boolean = false;
 
   constructor(lineCount: number = 100) {
     this.lineCount = lineCount;
@@ -29,20 +30,25 @@ export class LogTailer {
     }
 
     // Stop previous tail
-    this.stop();
+    await this.stop();
 
+    this.isStopped = false;
     this.filePath = filePath;
 
     try {
       // Read last N lines efficiently
       await this.readLastLines();
 
-      // Watch for changes
+      if (this.isStopped) return;
+
+      // Watch for changes (non-blocking)
       this.watchFile();
 
       // Notify subscribers
       this.notifySubscribers();
     } catch (error) {
+      if (this.isStopped) return;
+
       this.lines = [
         `Error reading log file: ${error instanceof Error ? error.message : String(error)}`,
       ];
@@ -54,6 +60,8 @@ export class LogTailer {
    * Stop tailing.
    */
   stop(): void {
+    this.isStopped = true;
+
     if (this.fileWatcher) {
       this.fileWatcher.close();
       this.fileWatcher = null;
@@ -92,21 +100,25 @@ export class LogTailer {
    * Only reads the end of the file, not the entire content.
    */
   private async readLastLines(): Promise<void> {
-    if (!this.filePath) return;
+    if (!this.filePath || this.isStopped) return;
+
+    let fd: fs.FileHandle | undefined;
 
     try {
       const stats = await fs.stat(this.filePath);
+
+      if (this.isStopped) return;
+
       const fileSize = stats.size;
 
       // Read last 64KB (or entire file if smaller)
       const bufferSize = Math.min(64 * 1024, fileSize);
       const buffer = Buffer.alloc(bufferSize);
 
-      const fd = await fs.open(this.filePath, 'r');
+      fd = await fs.open(this.filePath, 'r');
       const readPosition = Math.max(0, fileSize - bufferSize);
 
       await fd.read(buffer, 0, bufferSize, readPosition);
-      await fd.close();
 
       const text = buffer.toString('utf-8');
       const allLines = text.split('\n').filter((line) => line.trim() !== '');
@@ -118,6 +130,10 @@ export class LogTailer {
       this.lines = [
         `Error reading log file: ${error instanceof Error ? error.message : String(error)}`,
       ];
+    } finally {
+      if (fd) {
+        await fd.close().catch(() => {});
+      }
     }
   }
 
@@ -128,8 +144,10 @@ export class LogTailer {
   private watchFile(): void {
     if (!this.filePath) return;
 
+    const filePathToWatch = this.filePath;
+
     try {
-      this.fileWatcher = chokidar.watch(this.filePath, {
+      this.fileWatcher = chokidar.watch(filePathToWatch, {
         persistent: true,
         ignoreInitial: true,
         awaitWriteFinish: {
@@ -166,10 +184,16 @@ export class LogTailer {
    * Read only new content from file (incremental read).
    */
   private async readNewContent(): Promise<void> {
-    if (!this.filePath) return;
+    if (!this.filePath || this.isStopped) return;
+
+    let fd: fs.FileHandle | undefined;
 
     try {
       const stats = await fs.stat(this.filePath);
+
+      // Check if stopped during async operation
+      if (!this.filePath || this.isStopped) return;
+
       const fileSize = stats.size;
 
       if (fileSize < this.lastPosition) {
@@ -187,9 +211,8 @@ export class LogTailer {
       const newBytes = fileSize - this.lastPosition;
       const buffer = Buffer.alloc(newBytes);
 
-      const fd = await fs.open(this.filePath, 'r');
+      fd = await fs.open(this.filePath, 'r');
       await fd.read(buffer, 0, newBytes, this.lastPosition);
-      await fd.close();
 
       const newText = buffer.toString('utf-8');
       const newLines = newText.split('\n').filter((line) => line.trim() !== '');
@@ -202,6 +225,10 @@ export class LogTailer {
       this.notifySubscribers();
     } catch (_error) {
       // Silently fail on read errors
+    } finally {
+      if (fd) {
+        await fd.close().catch(() => {});
+      }
     }
   }
 

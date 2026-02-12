@@ -27,7 +27,7 @@ export async function startCommand(modules: string[], options: StartOptions): Pr
     // Check prerequisites before starting
     if (config.global?.prerequisites) {
       console.log(`${colors.cyan(colors.bold(`${icons.check} Checking prerequisites...`))}\n`);
-      const results = checkPrerequisites(config.global.prerequisites);
+      const results = await checkPrerequisites(config.global.prerequisites);
       const allPassed = results.allMet;
 
       printPrerequisitesReport(results);

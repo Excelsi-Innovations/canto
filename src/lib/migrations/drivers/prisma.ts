@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { type IMigrationDriver } from '../driver.interface.js';
 import { type Migration, type MigrationStatus } from '../types.js';
@@ -37,22 +37,65 @@ export class PrismaDriver implements IMigrationDriver {
   }
 
   async detect(cwd: string): Promise<boolean> {
-    // Check for prisma directory or schema.prisma
-    return (
-      existsSync(join(cwd, 'prisma', 'schema.prisma')) || existsSync(join(cwd, 'schema.prisma'))
-    );
+    // 1. Check root
+    if (this.checkPath(join(cwd, 'prisma', 'schema.prisma'), cwd)) return true;
+    if (this.checkPath(join(cwd, 'schema.prisma'), cwd)) return true;
+
+    // 2. Monorepo / Sub-directory detection
+    const commonDirs = ['packages', 'apps', 'services', 'backend'];
+
+    for (const dir of commonDirs) {
+      const basePath = join(cwd, dir);
+      if (existsSync(basePath)) {
+        try {
+          if (statSync(basePath).isDirectory()) {
+            const subdirs = readdirSync(basePath);
+            for (const sub of subdirs) {
+              const subPath = join(basePath, sub);
+              if (existsSync(subPath) && statSync(subPath).isDirectory()) {
+                // Check packages/foo/prisma/schema.prisma
+                if (this.checkPath(join(subPath, 'prisma', 'schema.prisma'), subPath)) return true;
+                // Check packages/foo/schema.prisma
+                if (this.checkPath(join(subPath, 'schema.prisma'), subPath)) return true;
+              }
+            }
+          }
+        } catch {
+          // Ignore access errors
+        }
+      }
+    }
+
+    return false;
   }
 
+  private projectRoot: string | null = null;
+
+  private checkPath(schemaPath: string, root: string): boolean {
+    if (existsSync(schemaPath)) {
+      this.projectRoot = root;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Execute command in the detected root if available, otherwise use provided cwd
+   */
+  private async run(command: string, cwd: string): Promise<{ stdout: string; stderr: string }> {
+    const workingDir = this.projectRoot ?? cwd;
+    return this.execAsync(command, { cwd: workingDir });
+  }
   async getStatus(cwd: string): Promise<Migration[]> {
     try {
       // Use 'prisma migrate status' to get raw status
       // Note: This command fails if DB is unreachable.
       // We might need a more robust way, but this is V1.
-      const { stdout } = await this.execAsync('npx prisma migrate status', { cwd });
+      const { stdout } = await this.run('npx prisma migrate status', cwd);
       return this.parseStatusOutput(stdout);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn('Prisma migrate status failed:', message);
+    } catch (_error: unknown) {
+      // const message = error instanceof Error ? error.message : String(error);
+      // console.warn('Prisma migrate status failed:', message);
 
       // Fallback: Read local migration files if DB is unreachable
       // This won't show 'applied' status correctly but at least shows files
@@ -61,18 +104,16 @@ export class PrismaDriver implements IMigrationDriver {
   }
 
   async apply(cwd: string): Promise<void> {
-    await this.execAsync('npx prisma migrate deploy', { cwd });
+    await this.run('npx prisma migrate deploy', cwd);
   }
 
   async reset(cwd: string): Promise<void> {
     // forceful reset
-    await this.execAsync('npx prisma migrate reset --force', { cwd });
+    await this.run('npx prisma migrate reset --force', cwd);
   }
 
   async generate(cwd: string, name: string): Promise<string> {
-    const { stdout } = await this.execAsync(`npx prisma migrate dev --name ${name} --create-only`, {
-      cwd,
-    });
+    const { stdout } = await this.run(`npx prisma migrate dev --name ${name} --create-only`, cwd);
     return stdout;
   }
 

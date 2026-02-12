@@ -366,30 +366,45 @@ const DashboardContent: React.FC = () => {
               </Box>
             )}
 
-            {/* Confirmation Modal */}
+            {/* Confirmation Modal - Bottom Position */}
             {confirmAction && (
-              <Box borderStyle="double" borderColor="yellow" padding={2} marginTop={1}>
-                <Box flexDirection="column">
+              <Box
+                position="absolute"
+                width="100%"
+                height="100%"
+                flexDirection="column"
+                justifyContent="flex-end"
+                alignItems="center"
+              >
+                <Box
+                  width="100%"
+                  height={8}
+                  borderStyle="double"
+                  borderColor="yellow"
+                  flexDirection="column"
+                  alignItems="center"
+                  justifyContent="center"
+                  backgroundColor={theme.colors.background}
+                >
                   <Text bold color="yellow">
-                    ⚠ Confirm Action
+                    ⚠️ Confirm Action
                   </Text>
-                  <Box marginTop={1}>
+                  <Box marginTop={0}>
                     {confirmAction.action.startsWith('bulk-') ? (
                       <Text>
                         Are you sure you want to{' '}
-                        <Text bold color={confirmAction.action.includes('stop') ? 'red' : 'yellow'}>
+                        <Text bold color={confirmAction.action.includes('stop') ? 'red' : 'green'}>
                           {confirmAction.action.replace('bulk-', '')}
                         </Text>{' '}
                         <Text bold color="cyan">
-                          {confirmAction.moduleNames?.length ?? 0} module
-                          {(confirmAction.moduleNames?.length ?? 0) > 1 ? 's' : ''}
+                          ALL {confirmAction.moduleNames?.length ?? 0} selected modules
                         </Text>
                         ?
                       </Text>
                     ) : (
                       <Text>
                         Are you sure you want to{' '}
-                        <Text bold color={confirmAction.action === 'stop' ? 'red' : 'yellow'}>
+                        <Text bold color={confirmAction.action === 'stop' ? 'red' : 'green'}>
                           {confirmAction.action}
                         </Text>{' '}
                         <Text bold color="cyan">
@@ -401,7 +416,14 @@ const DashboardContent: React.FC = () => {
                   </Box>
                   <Box marginTop={1}>
                     <Text dimColor>
-                      <Text color="green">[Y]</Text> Confirm • <Text color="red">[N]</Text> Cancel
+                      <Text color="green" bold>
+                        [Y]
+                      </Text>{' '}
+                      Confirm •{' '}
+                      <Text color="red" bold>
+                        [N]
+                      </Text>{' '}
+                      Cancel
                     </Text>
                   </Box>
                 </Box>

@@ -11,6 +11,15 @@ export class ProcessManager {
   private outputs: Map<string, string[]> = new Map();
   private listeners: Map<string, Set<(data: string) => void>> = new Map();
 
+  private static instance: ProcessManager;
+
+  public static getInstance(): ProcessManager {
+    if (!ProcessManager.instance) {
+      ProcessManager.instance = new ProcessManager();
+    }
+    return ProcessManager.instance;
+  }
+
   /**
    * Subscribe to process output
    */
@@ -70,6 +79,17 @@ export class ProcessManager {
       status: ProcessStatus.STARTING,
       startedAt: new Date(),
     };
+
+    if (logFile) {
+      // Ensure log directory exists
+      const { mkdirSync } = await import('fs');
+      const { dirname } = await import('path');
+      try {
+        mkdirSync(dirname(logFile), { recursive: true });
+      } catch {
+        // Ignore error if directory already exists
+      }
+    }
 
     this.processes.set(id, processInfo);
 

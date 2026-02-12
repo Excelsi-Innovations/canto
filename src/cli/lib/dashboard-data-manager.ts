@@ -246,7 +246,7 @@ export class DashboardDataManager {
   private startIncrementalUpdates(): void {
     this.updateTimer = setInterval(() => {
       this.updateDirtyModules();
-    }, 1000); // Update every 1 second
+    }, 3000); // Update every 3 seconds
   }
 
   /**
@@ -294,13 +294,13 @@ export class DashboardDataManager {
         return;
       }
 
-      const status = this.processManager.getStatus(moduleName);
+      const processInfo = this.processManager.getStatus(moduleName);
       const pid = this.processManager.getPid(moduleName);
 
       const moduleStatus: ModuleStatus = {
         name: moduleName,
         type: module.type,
-        status: (status ?? 'STOPPED') as ModuleStatus['status'],
+        status: (processInfo?.status ?? 'STOPPED') as ModuleStatus['status'],
         pid,
       };
 

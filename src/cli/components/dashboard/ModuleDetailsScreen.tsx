@@ -348,7 +348,9 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
             {visibleLogs.length === 0 ? (
               <Text dimColor>No logs available</Text>
             ) : (
-              visibleLogs.map((line, index) => colorizeLogLine(line, scrollOffset + index))
+              visibleLogs.map((line, index) => (
+                <Box key={scrollOffset + index}>{colorizeLogLine(line, scrollOffset + index)}</Box>
+              ))
             )}
           </Box>
         </Box>

@@ -207,20 +207,20 @@ describe('AsyncResourceMonitor', () => {
   });
 
   describe('memory leaks', () => {
-    test('should clean up subscribers on stop', () => {
+    test('should clean up subscribers on stop', async () => {
       const subscriber = mock(() => {});
 
       monitor.subscribe(subscriber);
       monitor.start();
-      monitor.stop();
+      await monitor.stop();
 
       // After stop, subscribers should not be called
       const initialCalls = subscriber.mock.calls.length;
 
-      // Wait a bit
-      setTimeout(() => {
-        expect(subscriber.mock.calls.length).toBe(initialCalls);
-      }, 200);
+      // Wait a bit to ensure no more calls
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      
+      expect(subscriber.mock.calls.length).toBe(initialCalls);
     });
   });
 });
