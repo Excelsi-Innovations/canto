@@ -19,9 +19,9 @@ export interface IMigrationDriver {
    * Capabilities supported by this driver
    */
   capabilities: {
-    canRollback: boolean;   // Supports 'down' migrations
-    canGenerate: boolean;   // Supports creating new migration files
-    canReset: boolean;      // Supports database reset
+    canRollback: boolean; // Supports 'down' migrations
+    canGenerate: boolean; // Supports creating new migration files
+    canReset: boolean; // Supports database reset
   };
 
   /**

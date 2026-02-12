@@ -24,6 +24,13 @@ export class MigrationService {
   }
 
   /**
+   * Clear all drivers (useful for testing)
+   */
+  clearDrivers(): void {
+    this.drivers = [];
+  }
+
+  /**
    * Detect which driver manages migrations in the current directory
    */
   async detect(cwd: string): Promise<IMigrationDriver | null> {
@@ -44,40 +51,45 @@ export class MigrationService {
   // --- Operations delegated to active driver ---
 
   async getStatus(cwd: string): Promise<Migration[]> {
-    if (!this.activeDriver) {
+    let driver = this.activeDriver;
+    if (!driver) {
       const detected = await this.detect(cwd);
       if (!detected) throw new Error('No migration driver detected for this project.');
+      driver = detected;
     }
-    return this.activeDriver!.getStatus(cwd);
+    return driver.getStatus(cwd);
   }
 
   async apply(cwd: string): Promise<void> {
-    if (!this.activeDriver) throw new Error('No active migration driver.');
-    await this.activeDriver!.apply(cwd);
+    const driver = this.activeDriver;
+    if (!driver) throw new Error('No active migration driver.');
+    await driver.apply(cwd);
   }
 
   async reset(cwd: string): Promise<void> {
-    if (!this.activeDriver) throw new Error('No active migration driver.');
-    
-    if (!this.activeDriver!.capabilities.canReset) {
-      throw new Error(`Driver '${this.activeDriver!.label}' does not support database reset.`);
+    const driver = this.activeDriver;
+    if (!driver) throw new Error('No active migration driver.');
+
+    if (!driver.capabilities.canReset) {
+      throw new Error(`Driver '${driver.label}' does not support database reset.`);
     }
-    
+
     // Safety check? (maybe in UI layer, but service should probably allow force)
-    if (this.activeDriver!.reset) {
-        await this.activeDriver!.reset(cwd);
+    if (driver.reset) {
+      await driver.reset(cwd);
     }
   }
 
   async rollback(cwd: string, steps = 1): Promise<void> {
-    if (!this.activeDriver) throw new Error('No active migration driver.');
-    
-    if (!this.activeDriver!.capabilities.canRollback) {
-      throw new Error(`Driver '${this.activeDriver!.label}' does not support rollback.`);
+    const driver = this.activeDriver;
+    if (!driver) throw new Error('No active migration driver.');
+
+    if (!driver.capabilities.canRollback) {
+      throw new Error(`Driver '${driver.label}' does not support rollback.`);
     }
 
-    if (this.activeDriver!.rollback) {
-        await this.activeDriver!.rollback(cwd, steps);
+    if (driver.rollback) {
+      await driver.rollback(cwd, steps);
     }
   }
 }

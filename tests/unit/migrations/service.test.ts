@@ -29,6 +29,7 @@ describe('MigrationService', () => {
         // Service doesn't expose list of drivers publicly or clear method.
         // We can just add our mock driver.
         service = MigrationService.getInstance();
+        service.clearDrivers(); // Remove default PrismaDriver
         service.registerDriver(mockDriver);
     });
 

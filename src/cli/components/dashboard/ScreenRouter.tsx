@@ -11,7 +11,7 @@ import { ModuleDetailsScreen } from './ModuleDetailsScreen.js';
 import { CommanderScreen } from './CommanderScreen.js';
 import { SplashScreen } from './SplashScreen.js';
 import { MigrationScreen } from '../migrations/MigrationScreen.js';
-import type { Theme } from '../../lib/themes.js';
+import type { Theme } from '../../../utils/preferences.js';
 
 interface ScreenRouterProps {
   screen: Screen;
@@ -95,12 +95,7 @@ export const ScreenRouter: React.FC<ScreenRouterProps> = ({
   }
 
   if (screen === 'migrations') {
-    return (
-       <MigrationScreen
-          cwd={process.cwd()}
-          theme={theme}
-       />
-    );
+    return <MigrationScreen cwd={process.cwd()} theme={theme} />;
   }
 
   if (screen === 'details') {

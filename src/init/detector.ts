@@ -531,4 +531,3 @@ export const ProjectDetectionResultSchema = z.object({
   nodeVersion: z.string().optional(),
   rootScripts: z.record(z.string(), z.string()),
 });
-

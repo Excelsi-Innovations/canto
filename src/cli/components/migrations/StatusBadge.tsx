@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text } from 'ink';
-import { type Theme } from '../../lib/themes.js';
+import { type Theme } from '../../../utils/preferences.js';
 import { type MigrationStatus } from '../../../lib/migrations/types.js';
 
 interface StatusBadgeProps {
@@ -13,9 +13,17 @@ export function StatusBadge({ status, theme }: StatusBadgeProps): React.JSX.Elem
     case 'applied':
       return <Text color={theme.colors.success}>[APPLIED]</Text>;
     case 'pending':
-      return <Text color={theme.colors.warning} bold>[PENDING]</Text>;
+      return (
+        <Text color={theme.colors.warning} bold>
+          [PENDING]
+        </Text>
+      );
     case 'failed':
-      return <Text color={theme.colors.error} bold>[FAILED]</Text>;
+      return (
+        <Text color={theme.colors.error} bold>
+          [FAILED]
+        </Text>
+      );
     case 'future':
       return <Text color={theme.colors.muted}>[FUTURE]</Text>;
     default:

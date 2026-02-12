@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { type IMigrationDriver } from '../driver.interface.js';
 import { type Migration, type MigrationStatus } from '../types.js';
@@ -10,24 +10,36 @@ const defaultExecAsync = promisify(exec);
 export class PrismaDriver implements IMigrationDriver {
   name = 'prisma';
   label = 'Prisma ORM';
-  
+
   capabilities = {
     canRollback: false, // Prisma doesn't support 'down' migrations easily
     canGenerate: true,
     canReset: true,
   };
 
-  private execAsync: (command: string, options?: any) => Promise<{ stdout: string; stderr: string }>;
+  private execAsync: (
+    command: string,
+    options?: Record<string, unknown>
+  ) => Promise<{ stdout: string; stderr: string }>;
 
-  constructor(execImpl?: (command: string, options?: any) => Promise<{ stdout: string; stderr: string }>) {
-    this.execAsync = execImpl || (defaultExecAsync as any);
+  constructor(
+    execImpl?: (
+      command: string,
+      options?: Record<string, unknown>
+    ) => Promise<{ stdout: string; stderr: string }>
+  ) {
+    this.execAsync =
+      execImpl ??
+      (defaultExecAsync as unknown as (
+        command: string,
+        options?: Record<string, unknown>
+      ) => Promise<{ stdout: string; stderr: string }>);
   }
 
   async detect(cwd: string): Promise<boolean> {
     // Check for prisma directory or schema.prisma
     return (
-      existsSync(join(cwd, 'prisma', 'schema.prisma')) ||
-      existsSync(join(cwd, 'schema.prisma'))
+      existsSync(join(cwd, 'prisma', 'schema.prisma')) || existsSync(join(cwd, 'schema.prisma'))
     );
   }
 
@@ -38,9 +50,10 @@ export class PrismaDriver implements IMigrationDriver {
       // We might need a more robust way, but this is V1.
       const { stdout } = await this.execAsync('npx prisma migrate status', { cwd });
       return this.parseStatusOutput(stdout);
-    } catch (error: any) {
-      console.warn('Prisma migrate status failed:', error.message);
-      
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn('Prisma migrate status failed:', message);
+
       // Fallback: Read local migration files if DB is unreachable
       // This won't show 'applied' status correctly but at least shows files
       return this.getLocalMigrations(cwd);
@@ -57,20 +70,22 @@ export class PrismaDriver implements IMigrationDriver {
   }
 
   async generate(cwd: string, name: string): Promise<string> {
-    const { stdout } = await this.execAsync(`npx prisma migrate dev --name ${name} --create-only`, { cwd });
+    const { stdout } = await this.execAsync(`npx prisma migrate dev --name ${name} --create-only`, {
+      cwd,
+    });
     return stdout;
   }
 
   private parseStatusOutput(output: string): Migration[] {
     const migrations: Migration[] = [];
-    
+
     // Prisma output format varies, but usually lists migrations.
     // This is a naive parser for V1.
     // Enhancing this requires parsing the table output or JSON if available (unstable).
-    
+
     // Example output to parse:
     // Status: 3 migrations found in prisma/migrations
-    // 
+    //
     // 20231026120000_init   (applied)
     // 20231027143000_add_user (pending)
 
@@ -79,21 +94,21 @@ export class PrismaDriver implements IMigrationDriver {
 
     // Use current time for timestamp approximation if parsing details fails
     // Ideally we parse the timestamp from the ID '20231026...'
-    
+
     for (const line of lines) {
       const match = line.trim().match(regex);
       if (match) {
-        const [_, id, name, statusRaw] = match;
-        
+        const [_, id, name, statusRaw] = match as unknown as [string, string, string, string];
+
         let status: MigrationStatus = 'pending';
         if (statusRaw === 'applied') status = 'applied';
-        
+
         migrations.push({
           id: `${id}_${name}`,
           name,
           timestamp: this.parseTimestampFromId(id),
           status,
-          appliedAt: status === 'applied' ? new Date() : undefined // We don't know exact applied time from thisCLI
+          appliedAt: status === 'applied' ? new Date() : undefined, // We don't know exact applied time from thisCLI
         });
       }
     }
@@ -101,7 +116,7 @@ export class PrismaDriver implements IMigrationDriver {
     return migrations;
   }
 
-  private getLocalMigrations(cwd: string): Migration[] {
+  private getLocalMigrations(_cwd: string): Migration[] {
     // Fallback detection
     // TODO: Implement fs scan of prisma/migrations folder
     return [];

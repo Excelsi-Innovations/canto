@@ -77,9 +77,9 @@ export function initState(detection: ProjectDetectionResult): ComposerState {
   if (detection.docker.composeFiles.length > 0) {
     const composeFile = detection.docker.composeFiles[0] ?? ''; // Safe fallback
     if (composeFile) {
-        const name = 'infra'; // Default name
+      const name = 'infra'; // Default name
 
-        modules.push({
+      modules.push({
         name,
         type: 'docker',
         category: 'infra',
@@ -87,7 +87,7 @@ export function initState(detection: ProjectDetectionResult): ComposerState {
         enabled: true,
         commands: {},
         dependsOn: [],
-        });
+      });
     }
   }
 
@@ -153,7 +153,7 @@ export function initState(detection: ProjectDetectionResult): ComposerState {
     customScripts,
     rootScripts: detection.rootScripts,
     // Use detected version or default to >=18
-    nodeVersion: detection.nodeVersion || '>=18.0.0',
+    nodeVersion: detection.nodeVersion ?? '>=18.0.0',
     requireDocker: detection.docker.composeFiles.length > 0 || detection.docker.hasDockerfile,
     requireDockerCompose: detection.docker.composeFiles.length > 0,
   };

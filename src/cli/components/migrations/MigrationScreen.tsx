@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { type Theme } from '../../lib/themes.js';
+import { type Theme } from '../../../utils/preferences.js';
 import { MigrationService } from '../../../lib/migrations/service.js';
 import { type Migration } from '../../../lib/migrations/types.js';
 import { type IMigrationDriver } from '../../../lib/migrations/driver.interface.js';
@@ -30,9 +30,7 @@ export function MigrationScreen({ cwd, theme }: MigrationScreenProps): React.JSX
     try {
       // Ensure driver is detected
       let activeDriver = service.getActiveDriver();
-      if (!activeDriver) {
-        activeDriver = await service.detect(cwd);
-      }
+      activeDriver ??= await service.detect(cwd);
       setDriver(activeDriver);
 
       if (activeDriver) {
@@ -42,8 +40,9 @@ export function MigrationScreen({ cwd, theme }: MigrationScreenProps): React.JSX
       } else {
         setError('No migration driver detected for this project.');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to load migrations');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || 'Failed to load migrations');
     } finally {
       setLoading(false);
       setStatusMessage('');
@@ -79,8 +78,9 @@ export function MigrationScreen({ cwd, theme }: MigrationScreenProps): React.JSX
         await service.apply(cwd);
         await loadStatus(); // Refresh after apply
         setStatusMessage('Migrations applied successfully!');
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
         setLoading(false);
       }
     }
@@ -96,24 +96,26 @@ export function MigrationScreen({ cwd, theme }: MigrationScreenProps): React.JSX
         await service.reset(cwd);
         await loadStatus();
         setStatusMessage('Database reset complete.');
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
         setLoading(false);
       }
     }
-    
+
     // Undo / Rollback
     if ((input === 'u' || input === 'U') && driver?.capabilities.canRollback) {
-        setLoading(true);
-        setStatusMessage('Rolling back last migration...');
-        try {
-            await service.rollback(cwd);
-            await loadStatus();
-            setStatusMessage('Rollback complete.');
-        } catch (err: any) {
-            setError(err.message);
-            setLoading(false);
-        }
+      setLoading(true);
+      setStatusMessage('Rolling back last migration...');
+      try {
+        await service.rollback(cwd);
+        await loadStatus();
+        setStatusMessage('Rollback complete.');
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+        setLoading(false);
+      }
     }
   });
 
@@ -121,8 +123,7 @@ export function MigrationScreen({ cwd, theme }: MigrationScreenProps): React.JSX
     return (
       <Box flexDirection="column" padding={1}>
         <Text color={theme.colors.info}>
-          <Spinner type="dots" />{' '}
-          {statusMessage}
+          <Spinner type="dots" /> {statusMessage}
         </Text>
       </Box>
     );
@@ -131,18 +132,20 @@ export function MigrationScreen({ cwd, theme }: MigrationScreenProps): React.JSX
   if (error) {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text color={theme.colors.error} bold>Error: {error}</Text>
+        <Text color={theme.colors.error} bold>
+          Error: {error}
+        </Text>
         <Text color={theme.colors.muted}>Press 'r' to retry.</Text>
       </Box>
     );
   }
 
   if (!driver) {
-     return (
-         <Box flexDirection="column" padding={1}>
-             <Text color={theme.colors.warning}>No migration logic detected.</Text>
-         </Box>
-     );
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text color={theme.colors.warning}>No migration logic detected.</Text>
+      </Box>
+    );
   }
 
   return (
@@ -153,11 +156,11 @@ export function MigrationScreen({ cwd, theme }: MigrationScreenProps): React.JSX
       </Box>
 
       <MigrationList migrations={migrations} selectedIndex={selectedIndex} theme={theme} />
-      
-      <MigrationActions 
-        canRollback={driver.capabilities.canRollback} 
-        canReset={driver.capabilities.canReset} 
-        theme={theme} 
+
+      <MigrationActions
+        canRollback={driver.capabilities.canRollback}
+        canReset={driver.capabilities.canReset}
+        theme={theme}
       />
     </Box>
   );

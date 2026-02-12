@@ -3,7 +3,6 @@ import {
   isWindows,
   isMacOS,
   isLinux,
-  isLinux,
   getPlatformCommand,
   getShell,
   getPathSeparator,

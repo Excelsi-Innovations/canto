@@ -35,7 +35,6 @@ describe('DependencyManager Integration', () => {
       name: 'module-a',
       path: join(TEST_DIR, 'module-a'),
       type: 'workspace',
-      type: 'workspace',
       packageManager: 'npm',
       enabled: true,
       dependsOn: [],
