@@ -16,6 +16,7 @@ export class LogTailer {
   private lastPosition: number = 0;
   private subscribers: Set<LogSubscriber> = new Set();
   private isStopped: boolean = false;
+  private readyPromise: Promise<void> | null = null;
 
   constructor(lineCount: number = 100) {
     this.lineCount = lineCount;
@@ -68,6 +69,7 @@ export class LogTailer {
     }
     this.filePath = null;
     this.lastPosition = 0;
+    this.readyPromise = null;
   }
 
   /**
@@ -146,6 +148,12 @@ export class LogTailer {
 
     const filePathToWatch = this.filePath;
 
+    // Create ready promise
+    let resolveReady: () => void = () => {};
+    this.readyPromise = new Promise((resolve) => {
+      resolveReady = resolve;
+    });
+
     try {
       this.fileWatcher = chokidar.watch(filePathToWatch, {
         persistent: true,
@@ -154,6 +162,10 @@ export class LogTailer {
           stabilityThreshold: 50, // Fast response for logs
           pollInterval: 10,
         },
+      });
+
+      this.fileWatcher.on('ready', () => {
+        if (resolveReady) resolveReady();
       });
 
       this.fileWatcher.on('change', async () => {
@@ -174,9 +186,21 @@ export class LogTailer {
 
       this.fileWatcher.on('error', () => {
         // Silently fail on watcher errors
+        if (resolveReady) resolveReady(); // Resolve to avoid hanging
       });
     } catch (_error) {
       // Silently fail if watching not supported
+      if (resolveReady) resolveReady();
+    }
+  }
+
+  /**
+   * Wait for the file watcher to be ready.
+   * Useful for testing.
+   */
+  async waitForReady(): Promise<void> {
+    if (this.readyPromise) {
+      await this.readyPromise;
     }
   }
 

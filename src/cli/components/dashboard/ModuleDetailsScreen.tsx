@@ -15,9 +15,12 @@ interface ModuleDetailsScreenProps extends ScreenProps {
  * Colorizes a log line based on keywords and patterns
  */
 function colorizeLogLine(line: string, index: number): React.ReactNode {
-  if (!line.trim()) {
+  // Sanitize line to prevent TUI breakage
+  const safeLine = line.replace(/\r/g, '');
+
+  if (!safeLine.trim()) {
     return (
-      <Text key={index} dimColor>
+      <Text key={index} dimColor wrap="wrap">
         {' '}
       </Text>
     );
@@ -25,47 +28,47 @@ function colorizeLogLine(line: string, index: number): React.ReactNode {
 
   // Check for error patterns
   if (
-    /error|exception|fatal|fail|crash|panic/i.test(line) ||
-    /\[ERROR\]|\[FATAL\]|ERROR:|FATAL:/i.test(line)
+    /error|exception|fatal|fail|crash|panic/i.test(safeLine) ||
+    /\[ERROR\]|\[FATAL\]|ERROR:|FATAL:/i.test(safeLine)
   ) {
     return (
-      <Text key={index} color="red">
-        {line}
+      <Text key={index} color="red" wrap="wrap">
+        {safeLine}
       </Text>
     );
   }
 
   // Check for warning patterns
-  if (/warn|warning|caution|alert/i.test(line) || /\[WARN\]|WARN:/i.test(line)) {
+  if (/warn|warning|caution|alert/i.test(safeLine) || /\[WARN\]|WARN:/i.test(safeLine)) {
     return (
-      <Text key={index} color="yellow">
-        {line}
+      <Text key={index} color="yellow" wrap="wrap">
+        {safeLine}
       </Text>
     );
   }
 
   // Check for success patterns
-  if (/success|complete|done|ready|listening|started/i.test(line)) {
+  if (/success|complete|done|ready|listening|started/i.test(safeLine)) {
     return (
-      <Text key={index} color="green">
-        {line}
+      <Text key={index} color="green" wrap="wrap">
+        {safeLine}
       </Text>
     );
   }
 
   // Check for info patterns
-  if (/info|debug|trace/i.test(line) || /\[INFO\]|\[DEBUG\]|INFO:|DEBUG:/i.test(line)) {
+  if (/info|debug|trace/i.test(safeLine) || /\[INFO\]|\[DEBUG\]|INFO:|DEBUG:/i.test(safeLine)) {
     return (
-      <Text key={index} color="cyan" dimColor>
-        {line}
+      <Text key={index} color="cyan" dimColor wrap="wrap">
+        {safeLine}
       </Text>
     );
   }
 
   // Default - regular log line
   return (
-    <Text key={index} dimColor>
-      {line}
+    <Text key={index} dimColor wrap="wrap">
+      {safeLine}
     </Text>
   );
 }
@@ -95,6 +98,19 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
     const [logLines, setLogLines] = useState<string[]>([]);
     const [scrollOffset, setScrollOffset] = useState(0);
     const maxVisibleLines = 15;
+    
+    const [autoScroll, setAutoScroll] = useState(true);
+
+    // Auto-scroll logic
+    useEffect(() => {
+      if (autoScroll) {
+        setScrollOffset(Math.max(0, logLines.length - maxVisibleLines));
+      }
+    }, [logLines, autoScroll]);
+
+    // Throttling refs
+    const latestLines = React.useRef<string[]>([]);
+    const updateTimeout = React.useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
       if (!module.name) {
@@ -102,7 +118,11 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
         return;
       }
 
-      const logPath = join(process.cwd(), 'tmp', `${module.name}.log`);
+      const logPath = join(process.cwd(), 'tmp', 'logs', `${module.name}.log`);
+      
+      // Reset
+      setAutoScroll(true);
+      setLogLines([]);
 
       if (!existsSync(logPath)) {
         setLogLines([`No log file found at: ${logPath}`]);
@@ -112,12 +132,20 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
       logTailer.start(logPath);
 
       const unsubscribe = logTailer.subscribe((lines) => {
-        setLogLines(lines);
-        setScrollOffset(Math.max(0, lines.length - maxVisibleLines));
+        latestLines.current = lines;
+
+        updateTimeout.current ??= setTimeout(() => {
+          setLogLines(latestLines.current);
+          updateTimeout.current = null;
+        }, 100);
       });
 
       return () => {
         unsubscribe();
+        if (updateTimeout.current) {
+          clearTimeout(updateTimeout.current);
+          updateTimeout.current = null;
+        }
         logTailer.stop();
       };
     }, [module.name, logTailer]);
@@ -127,17 +155,29 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
         onQuit();
       } else if (input === 'b' || input === 'B' || key.escape) {
         onBack();
+      } else if (input === 'g') {
+        // Go to Top
+        setScrollOffset(0);
+        setAutoScroll(false);
+      } else if (input === 'G') {
+        // Go to Bottom
+        setAutoScroll(true);
       } else if (key.upArrow && scrollOffset > 0) {
         setScrollOffset(scrollOffset - 1);
+        setAutoScroll(false);
       } else if (key.downArrow && scrollOffset < logLines.length - maxVisibleLines) {
-        setScrollOffset(scrollOffset + 1);
+        const newOffset = scrollOffset + 1;
+        setScrollOffset(newOffset);
+        if (newOffset >= logLines.length - maxVisibleLines) {
+          setAutoScroll(true);
+        }
       }
     });
 
     const visibleLogs = logLines.slice(scrollOffset, scrollOffset + maxVisibleLines);
 
     return (
-      <Box flexDirection="column" padding={1}>
+      <Box flexDirection="column" padding={1} width="100%">
         {/* Header */}
         <Box borderStyle="double" borderColor="cyan" padding={1} marginBottom={1}>
           <Text bold color="cyan">
@@ -317,6 +357,20 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
                     <Text color={container.status === 'running' ? 'green' : 'gray'}>
                       ({container.status})
                     </Text>
+                    {container.health && (
+                      <Text
+                        color={
+                          container.health === 'healthy'
+                            ? 'green'
+                            : container.health === 'unhealthy'
+                              ? 'red'
+                              : 'yellow'
+                        }
+                      >
+                        {' '}
+                        {container.health.toUpperCase()}
+                      </Text>
+                    )}
                   </Text>
                   {container.ports.length > 0 && (
                     <Text dimColor> Ports: {container.ports.join(', ')}</Text>
@@ -334,6 +388,7 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
           padding={1}
           marginBottom={1}
           flexDirection="column"
+          width="100%"
         >
           <Text bold color="yellow">
             Real-time Logs (last {maxVisibleLines} lines)
@@ -357,7 +412,7 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
 
         {/* Footer */}
         <Box borderStyle="single" borderColor="gray" padding={1}>
-          <Text dimColor>Press 'b' or ESC to go back • Press 'q' to quit • ↑↓ to scroll logs</Text>
+          <Text dimColor>Press 'b' or ESC to go back • Press 'q' to quit • ↑↓ to scroll logs • 'G' to bottom</Text>
         </Box>
       </Box>
     );

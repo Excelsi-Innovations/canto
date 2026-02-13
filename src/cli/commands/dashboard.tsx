@@ -21,8 +21,8 @@ const DashboardContent: React.FC = () => {
   const [selectedModule, setSelectedModule] = useState(0);
 
   // Process Manager for background tasks (Commander)
-  // Persists across screen navigation
-  const processManager = useMemo(() => new ProcessManager(), []);
+  // Persists across screen navigation, using Singleton to share state with CLI exit handlers
+  const processManager = useMemo(() => ProcessManager.getInstance(), []);
 
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -473,9 +473,17 @@ export async function dashboardCommand(): Promise<void> {
   process.stdout.write('\x1b[?25l');
 
   let cleanupCalled = false;
-  const cleanup = () => {
+  const cleanup = async () => {
     if (cleanupCalled) return;
     cleanupCalled = true;
+
+    // Gracefully stop all child processes
+    try {
+      await ProcessManager.getInstance().stopAll();
+    } catch {
+      // ignore
+    }
+
     // Show cursor
     process.stdout.write('\x1b[?25h');
     // Leave alternate screen buffer
@@ -487,8 +495,8 @@ export async function dashboardCommand(): Promise<void> {
   };
 
   // Ensure cleanup on exit signals
-  const exitHandler = () => {
-    cleanup();
+  const exitHandler = async () => {
+    await cleanup();
     process.exit(0);
   };
 
@@ -501,10 +509,10 @@ export async function dashboardCommand(): Promise<void> {
   } catch {
     // Dashboard exited with error — cleanup handles it
   } finally {
-    cleanup();
-    // Force exit after 100ms if cleanup is slow
+    await cleanup();
+    // Force exit after 500ms if cleanup is slow
     setTimeout(() => {
       process.exit(0);
-    }, 100);
+    }, 500);
   }
 }

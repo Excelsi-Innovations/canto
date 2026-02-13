@@ -123,7 +123,7 @@ export function MigrationScreen({ cwd, theme }: MigrationScreenProps): React.JSX
     return (
       <Box flexDirection="column" padding={1}>
         <Text color={theme.colors.info}>
-          <Spinner type="dots" /> {statusMessage}
+          <Spinner type="dots" /> <Text>{statusMessage}</Text>
         </Text>
       </Box>
     );

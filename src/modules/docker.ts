@@ -47,13 +47,11 @@ export class DockerExecutor {
 
     if (existsSync(rootEnvPath)) {
       const rootEnv = dotenv.parse(readFileSync(rootEnvPath));
-      // dotenv.parse returns string values, safe to merge
       envVars = { ...envVars, ...rootEnv };
     }
 
     // Merge with config.env
     if (config.env) {
-      // Force cast config.env values to string | undefined to satisfy the type
       const configEnv = config.env as Record<string, unknown>;
       const safeConfigEnv: Record<string, string | undefined> = {};
       for (const [key, val] of Object.entries(configEnv)) {
@@ -66,12 +64,35 @@ export class DockerExecutor {
       envVars = { ...envVars, ...safeConfigEnv };
     }
 
-    const command =
-      `${this.composeCommand} -f ${composeFilePath} ${profiles} up ${services}`.trim();
+    // Use process.cwd() as project directory to ensure consistent context
+    const projectDirFlag = `--project-directory "${process.cwd()}"`;
+
+    // 1. Start containers in detached mode (Sync)
+    // This allows them to run in background even if the log viewer stops
+    const upCommand =
+      `${this.composeCommand} ${projectDirFlag} -f ${composeFilePath} ${profiles} up -d ${services}`.trim();
+
+    try {
+      // Execute up -d synchronously using proper env vars
+      execSync(upCommand, {
+        cwd,
+        env: envVars as NodeJS.ProcessEnv, // Cast to compatible type
+        stdio: 'pipe', // Capture output to avoid polluting stdout
+      });
+    } catch (error) {
+      throw new Error(
+        `Failed to start Docker containers: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    // 2. Spawn logs -f as the long-running process
+    // This solves the 'STOPPED' status issue, as logs -f keeps running
+    const logsCommand =
+      `${this.composeCommand} ${projectDirFlag} -f ${composeFilePath} logs -f ${services}`.trim();
 
     return this.processManager.spawn({
       id,
-      command,
+      command: logsCommand,
       cwd,
       env: envVars as Record<string, string>,
       logFile: join(process.cwd(), 'tmp', 'logs', `${id}.log`),
@@ -92,11 +113,15 @@ export class DockerExecutor {
     const cwd = dirname(composeFilePath);
     const services = config.services?.join(' ') ?? '';
 
+    const projectDirFlag = `--project-directory "${process.cwd()}"`;
     try {
-      execSync(`${this.composeCommand} -f ${composeFilePath} down ${services}`.trim(), {
-        cwd,
-        stdio: 'inherit',
-      });
+      execSync(
+        `${this.composeCommand} ${projectDirFlag} -f ${composeFilePath} down ${services}`.trim(),
+        {
+          cwd,
+          stdio: 'inherit',
+        }
+      );
     } catch (error) {
       console.error('Error stopping Docker Compose services:', error);
     }
@@ -123,7 +148,7 @@ export class DockerExecutor {
    * @returns Array of Docker containers
    */
   getContainers(config: DockerModule): DockerContainer[] {
-    return listContainers(config.composeFile);
+    return listContainers(config.composeFile, process.cwd());
   }
 
   /**
@@ -133,6 +158,6 @@ export class DockerExecutor {
    * @returns Array of services with container info
    */
   getServices(config: DockerModule): DockerComposeService[] {
-    return getServicesContainers(config.composeFile, config.services);
+    return getServicesContainers(config.composeFile, config.services, process.cwd());
   }
 }

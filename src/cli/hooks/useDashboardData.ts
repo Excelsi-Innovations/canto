@@ -206,9 +206,18 @@ export function useDashboardData() {
         }
       }
 
+      // Only reset auto-restart state if module has been RUNNING long enough
+      // to be considered stable (prevents infinite loop when process briefly
+      // enters RUNNING before crashing)
       if (module.status === 'RUNNING' && state) {
-        autoRestartManager.resetState(module.name);
-        shownAutoRestartAlerts.current.delete(`${module.name}-restart`);
+        const STABILITY_WINDOW_MS = 15_000; // 15 seconds
+        const { startedAt } = module;
+        const uptime = startedAt ? Date.now() - new Date(startedAt).getTime() : 0;
+
+        if (uptime >= STABILITY_WINDOW_MS) {
+          autoRestartManager.resetState(module.name);
+          shownAutoRestartAlerts.current.delete(`${module.name}-restart`);
+        }
       }
     });
   }, [

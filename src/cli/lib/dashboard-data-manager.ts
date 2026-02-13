@@ -65,6 +65,17 @@ export class DashboardDataManager {
       return;
     }
 
+    // Ensure logs directory exists
+    try {
+      const logsDir = path.join(this.configPath, 'tmp', 'logs');
+      const fs = await import('fs');
+      if (!fs.existsSync(logsDir)) {
+        fs.mkdirSync(logsDir, { recursive: true });
+      }
+    } catch (error) {
+      console.error('Failed to create logs directory:', error);
+    }
+
     // Check Docker daemon is running (not just CLI installed)
     this.dockerAvailable = isDockerRunning();
 
@@ -297,11 +308,14 @@ export class DashboardDataManager {
       const processInfo = this.processManager.getStatus(moduleName);
       const pid = this.processManager.getPid(moduleName);
 
+      const status = this.mapProcessStatus(processInfo?.status);
+
       const moduleStatus: ModuleStatus = {
         name: moduleName,
         type: module.type,
-        status: (processInfo?.status ?? 'STOPPED') as ModuleStatus['status'],
+        status,
         pid,
+        startedAt: processInfo?.startedAt,
       };
 
       // Get process resources if we have a PID
@@ -330,6 +344,7 @@ export class DashboardDataManager {
                 return {
                   name: container.name,
                   status: container.status,
+                  health: container.health,
                   ports: container.ports
                     .map((p) => {
                       const match = p.match(/(?:[\d.]+:)?(\d+)->/);
@@ -349,6 +364,30 @@ export class DashboardDataManager {
       this.cache.lastUpdate.set(moduleName, Date.now());
     } catch {
       // Silently fail for individual module updates
+    }
+  }
+
+  /**
+   * Map process status (lowercase enum) to module status (uppercase union)
+   */
+  private mapProcessStatus(status?: string): ModuleStatus['status'] {
+    if (!status) return 'STOPPED';
+
+    switch (status) {
+      case 'running':
+        return 'RUNNING';
+      case 'starting':
+        return 'STARTING';
+      case 'stopping':
+        return 'STOPPING';
+      case 'stopped':
+        return 'STOPPED';
+      case 'failed':
+        return 'ERROR';
+      case 'idle':
+        return 'STOPPED';
+      default:
+        return 'STOPPED';
     }
   }
 

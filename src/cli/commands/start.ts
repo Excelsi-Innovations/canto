@@ -22,6 +22,15 @@ export async function startCommand(modules: string[], options: StartOptions): Pr
   const startTime = Date.now();
 
   try {
+    // Ensure logs directory exists
+    const { mkdirSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    try {
+      mkdirSync(join(process.cwd(), 'tmp', 'logs'), { recursive: true });
+    } catch {
+      // Ignore if exists
+    }
+
     const config = await loadConfig();
 
     // Check prerequisites before starting

@@ -10,6 +10,7 @@ export interface DockerContainer {
   id: string;
   name: string;
   status: 'running' | 'exited' | 'paused' | 'restarting' | 'dead' | 'created' | 'unknown';
+  health?: 'healthy' | 'unhealthy' | 'starting';
   image: string;
   ports: string[];
   created: string;
@@ -68,6 +69,14 @@ export function isDockerRunning(): boolean {
   }
 }
 
+function parseContainerHealth(statusStr: string): 'healthy' | 'unhealthy' | 'starting' | undefined {
+  const lower = statusStr.toLowerCase();
+  if (lower.includes('(healthy)')) return 'healthy';
+  if (lower.includes('(unhealthy)')) return 'unhealthy';
+  if (lower.includes('(health: starting)')) return 'starting';
+  return undefined;
+}
+
 /**
  * Parse Docker container status from docker ps output
  */
@@ -91,7 +100,7 @@ function parseContainerStatus(
  * @param composeFilePath - Path to docker-compose.yml
  * @returns Array of Docker containers
  */
-export function listContainers(composeFilePath: string): DockerContainer[] {
+export function listContainers(composeFilePath: string, projectRoot?: string): DockerContainer[] {
   // Check cache first
   const cached = dockerCache.get(composeFilePath);
   if (cached) {
@@ -102,11 +111,15 @@ export function listContainers(composeFilePath: string): DockerContainer[] {
     const cwd = dirname(composeFilePath);
 
     // Get project name from docker-compose.yml
-    const projectName = execSync(`docker compose -f ${composeFilePath} config --format json`, {
-      cwd,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'ignore'],
-    });
+    const projectDirFlag = projectRoot ? `--project-directory ${projectRoot}` : '';
+    const projectName = execSync(
+      `docker compose -f ${composeFilePath} ${projectDirFlag} config --format json`,
+      {
+        cwd,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'ignore'],
+      }
+    );
 
     let project = 'default';
     try {
@@ -136,6 +149,7 @@ export function listContainers(composeFilePath: string): DockerContainer[] {
         id: id ?? '',
         name: name ?? '',
         status: parseContainerStatus(status ?? ''),
+        health: parseContainerHealth(status ?? ''),
         image: image ?? '',
         ports: ports ? ports.split(',').map((p) => p.trim()) : [],
         created: created ?? '',
@@ -161,9 +175,10 @@ export function listContainers(composeFilePath: string): DockerContainer[] {
  */
 export function getServicesContainers(
   composeFile: string,
-  services?: string[]
+  services?: string[],
+  projectRoot?: string
 ): DockerComposeService[] {
-  const containers = listContainers(composeFile);
+  const containers = listContainers(composeFile, projectRoot);
 
   if (!services || services.length === 0) {
     // Return all containers as services

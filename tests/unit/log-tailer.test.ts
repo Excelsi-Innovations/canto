@@ -258,11 +258,14 @@ describe('LogTailer', () => {
 
       expect(updateCount).toBe(1); // Initial call
 
+      // Wait for watcher to be ready
+      await tailer.waitForReady();
+
       // Append to file
       await fs.appendFile(testLogPath, 'New line\n');
 
-      // Wait for file watch event (chokidar init is non-blocking)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Wait for file watch event
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       expect(updateCount).toBeGreaterThan(1); // Should have been called again
     }, { timeout: 5000 });
@@ -276,11 +279,14 @@ describe('LogTailer', () => {
       let lines = tailer.getLines();
       expect(lines).toEqual(['Line 1']);
 
+      // Wait for watcher to be ready
+      await tailer.waitForReady();
+
       // Append new content
       await fs.appendFile(testLogPath, 'Line 2\n');
 
-      // Wait for file watch event (chokidar init is non-blocking)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Wait for file watch event
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       lines = tailer.getLines();
       expect(lines).toContain('Line 1');
@@ -295,11 +301,14 @@ describe('LogTailer', () => {
       let lines = tailer.getLines();
       expect(lines.length).toBe(10);
 
+      // Wait for watcher to be ready
+      await tailer.waitForReady();
+
       // Add more lines
       await fs.appendFile(testLogPath, '\nNew 1\nNew 2\nNew 3\n');
 
-      // Wait for file watch event (chokidar init is non-blocking)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Wait for file watch event
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       lines = tailer.getLines();
       expect(lines.length).toBeLessThanOrEqual(10); // Should still be limited
@@ -310,11 +319,14 @@ describe('LogTailer', () => {
       await fs.writeFile(testLogPath, 'Line 1\nLine 2\nLine 3\n');
       await tailer.start(testLogPath);
 
+      // Wait for watcher to be ready
+      await tailer.waitForReady();
+
       // Truncate file
       await fs.writeFile(testLogPath, 'New content\n');
 
-      // Wait for file watch event (chokidar init is non-blocking)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Wait for file watch event
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const lines = tailer.getLines();
       expect(lines).toContain('New content');
@@ -325,11 +337,14 @@ describe('LogTailer', () => {
       await fs.writeFile(testLogPath, 'Original content\n');
       await tailer.start(testLogPath);
 
+      // Wait for watcher to be ready
+      await tailer.waitForReady();
+
       // Simulate log rotation (file shrinks)
       await fs.writeFile(testLogPath, 'Rotated\n');
 
-      // Wait for file watch event (chokidar init is non-blocking)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Wait for file watch event
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const lines = tailer.getLines();
       expect(lines).toContain('Rotated');

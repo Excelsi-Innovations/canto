@@ -24,22 +24,22 @@ export function MigrationActions({
       <Box marginRight={2}>
         <Text color={theme.colors.info} bold>
           A
-        </Text>{' '}
-        <Text>Apply Pending</Text>
+        </Text>
+        <Text> Apply Pending</Text>
       </Box>
       <Box marginRight={2}>
         <Text color={theme.colors.info} bold>
           R
-        </Text>{' '}
-        <Text>Refresh</Text>
+        </Text>
+        <Text> Refresh</Text>
       </Box>
 
       {canRollback && (
         <Box marginRight={2}>
           <Text color={theme.colors.warning} bold>
             U
-          </Text>{' '}
-          <Text>Undo Last</Text>
+          </Text>
+          <Text> Undo Last</Text>
         </Box>
       )}
 
@@ -47,8 +47,8 @@ export function MigrationActions({
         <Box marginRight={2}>
           <Text color={theme.colors.error} bold>
             X
-          </Text>{' '}
-          <Text>Reset DB</Text>
+          </Text>
+          <Text> Reset DB</Text>
         </Box>
       )}
 

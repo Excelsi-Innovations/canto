@@ -168,6 +168,20 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
                     {container.status === 'running' ? '●' : '○'}
                   </Text>{' '}
                   {container.name}
+                  {container.health && (
+                    <Text
+                      color={
+                        container.health === 'healthy'
+                          ? 'green'
+                          : container.health === 'unhealthy'
+                            ? 'red'
+                            : 'yellow'
+                      }
+                    >
+                      {' '}
+                      ({container.health})
+                    </Text>
+                  )}
                   {container.ports.length > 0 && (
                     <Text color="cyan"> {container.ports.join(', ')}</Text>
                   )}
