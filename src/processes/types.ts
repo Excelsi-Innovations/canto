@@ -7,6 +7,21 @@ export enum ProcessStatus {
   FAILED = 'failed',
 }
 
+export interface SpawnOptions {
+  id: string;
+  command: string;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+  logFile?: string;
+  shell?: boolean | string;
+  detached?: boolean;
+  onExit?: (code: number | null, signal: NodeJS.Signals | null) => void;
+  onStop?: () => Promise<void> | void;
+  onData?: (data: string) => void;
+  onError?: (data: string) => void;
+}
+
 export interface ProcessInfo {
   id: string;
   pid?: number;
@@ -19,19 +34,8 @@ export interface ProcessInfo {
   stoppedAt?: Date;
   exitCode?: number;
   error?: string;
-}
-
-export interface SpawnOptions {
-  id: string;
-  command: string;
-  args?: string[];
-  cwd?: string;
-  env?: Record<string, string>;
-  logFile?: string;
-  shell?: boolean | string;
-  onExit?: (code: number | null, signal: NodeJS.Signals | null) => void;
-  onData?: (data: string) => void;
-  onError?: (data: string) => void;
+  detached?: boolean;
+  onStop?: () => Promise<void> | void;
 }
 
 export interface ProcessResult {

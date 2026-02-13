@@ -35,34 +35,18 @@ export class DockerExecutor {
    * @param config - Docker module configuration
    * @returns Promise resolving to process result
    */
-  async start(id: string, config: DockerModule): Promise<ProcessResult> {
+  async start(
+    id: string,
+    config: DockerModule,
+    options?: { detached?: boolean }
+  ): Promise<ProcessResult> {
     const composeFilePath = resolve(config.composeFile);
     const cwd = dirname(composeFilePath);
     const services = config.services?.join(' ') ?? '';
     const profiles = config.profiles?.map((p) => `--profile ${p}`).join(' ') ?? '';
 
-    // Load .env from project root if it exists
-    let envVars: Record<string, string | undefined> = { ...process.env };
-    const rootEnvPath = join(process.cwd(), '.env');
-
-    if (existsSync(rootEnvPath)) {
-      const rootEnv = dotenv.parse(readFileSync(rootEnvPath));
-      envVars = { ...envVars, ...rootEnv };
-    }
-
-    // Merge with config.env
-    if (config.env) {
-      const configEnv = config.env as Record<string, unknown>;
-      const safeConfigEnv: Record<string, string | undefined> = {};
-      for (const [key, val] of Object.entries(configEnv)) {
-        if (typeof val === 'string' || val === undefined) {
-          safeConfigEnv[key] = val;
-        } else {
-          safeConfigEnv[key] = String(val);
-        }
-      }
-      envVars = { ...envVars, ...safeConfigEnv };
-    }
+    // Get environment variables
+    const envVars = this.getEnvVars(config);
 
     // Use process.cwd() as project directory to ensure consistent context
     const projectDirFlag = `--project-directory "${process.cwd()}"`;
@@ -76,7 +60,7 @@ export class DockerExecutor {
       // Execute up -d synchronously using proper env vars
       execSync(upCommand, {
         cwd,
-        env: envVars as NodeJS.ProcessEnv, // Cast to compatible type
+        env: envVars,
         stdio: 'pipe', // Capture output to avoid polluting stdout
       });
     } catch (error) {
@@ -96,6 +80,21 @@ export class DockerExecutor {
       cwd,
       env: envVars as Record<string, string>,
       logFile: join(process.cwd(), 'tmp', 'logs', `${id}.log`),
+      detached: options?.detached,
+      onStop: async () => {
+        // Stop containers when the log process is killed (Interactive Mode fallback)
+        try {
+          const stopCommand =
+            `${this.composeCommand} ${projectDirFlag} -f ${composeFilePath} stop ${services}`.trim();
+          execSync(stopCommand, {
+            cwd,
+            env: envVars,
+            stdio: 'ignore', // Suppress output
+          });
+        } catch (_error) {
+          // Ignore errors during shutdown
+        }
+      },
     });
   }
 
@@ -107,26 +106,50 @@ export class DockerExecutor {
    * @returns Promise resolving to process result
    */
   async stop(id: string, config: DockerModule): Promise<ProcessResult> {
-    const result = await this.processManager.stop(id);
-
+    // Explicitly run stop command (Daemon Mode support)
     const composeFilePath = resolve(config.composeFile);
     const cwd = dirname(composeFilePath);
     const services = config.services?.join(' ') ?? '';
-
+    const envVars = this.getEnvVars(config);
     const projectDirFlag = `--project-directory "${process.cwd()}"`;
+
     try {
-      execSync(
-        `${this.composeCommand} ${projectDirFlag} -f ${composeFilePath} down ${services}`.trim(),
-        {
-          cwd,
-          stdio: 'inherit',
-        }
-      );
+      const stopCommand =
+        `${this.composeCommand} ${projectDirFlag} -f ${composeFilePath} stop ${services}`.trim();
+      execSync(stopCommand, {
+        cwd,
+        env: envVars,
+        stdio: 'ignore',
+      });
     } catch (error) {
-      console.error('Error stopping Docker Compose services:', error);
+      console.warn(`Failed to stop docker containers for ${id}:`, error);
     }
 
-    return result;
+    return this.processManager.stop(id);
+  }
+
+  private getEnvVars(config: DockerModule): NodeJS.ProcessEnv {
+    let envVars: Record<string, string | undefined> = { ...process.env };
+    const rootEnvPath = join(process.cwd(), '.env');
+
+    if (existsSync(rootEnvPath)) {
+      const rootEnv = dotenv.parse(readFileSync(rootEnvPath));
+      envVars = { ...envVars, ...rootEnv };
+    }
+
+    if (config.env) {
+      const configEnv = config.env as Record<string, unknown>;
+      const safeConfigEnv: Record<string, string | undefined> = {};
+      for (const [key, val] of Object.entries(configEnv)) {
+        if (typeof val === 'string' || val === undefined) {
+          safeConfigEnv[key] = val;
+        } else {
+          safeConfigEnv[key] = String(val);
+        }
+      }
+      envVars = { ...envVars, ...safeConfigEnv };
+    }
+    return envVars as NodeJS.ProcessEnv;
   }
 
   /**

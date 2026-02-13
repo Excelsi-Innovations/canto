@@ -22,7 +22,11 @@ export class WorkspaceExecutor {
    * @param config - Workspace module configuration
    * @returns Promise resolving to process result
    */
-  async start(id: string, config: WorkspaceModule): Promise<ProcessResult> {
+  async start(
+    id: string,
+    config: WorkspaceModule,
+    options?: { detached?: boolean }
+  ): Promise<ProcessResult> {
     const cwd = resolve(config.path);
     const command = config.run.dev ?? config.run.start ?? config.run.build;
 
@@ -36,6 +40,7 @@ export class WorkspaceExecutor {
       cwd,
       env: config.env as Record<string, string> | undefined,
       logFile: join(process.cwd(), 'tmp', 'logs', `${id}.log`),
+      detached: options?.detached,
     });
   }
 

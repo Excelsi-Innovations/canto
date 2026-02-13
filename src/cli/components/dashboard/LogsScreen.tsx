@@ -138,7 +138,7 @@ export const LogsScreen: React.FC<LogsScreenProps> = React.memo(
         updateTimeout.current ??= setTimeout(() => {
           setLogLines(latestLines.current);
           updateTimeout.current = null;
-        }, 100); 
+        }, 100);
       });
 
       return () => {
@@ -178,7 +178,7 @@ export const LogsScreen: React.FC<LogsScreenProps> = React.memo(
         const newOffset = Math.min(maxOffset, scrollOffset + 1);
         setScrollOffset(newOffset);
         if (newOffset >= maxOffset) {
-             setAutoScroll(true);
+          setAutoScroll(true);
         }
       }
     });

@@ -38,7 +38,7 @@ export function useDashboardData() {
   const [forceUpdate, setForceUpdate] = useState(0);
 
   // Managers
-  const [processManager] = useState(() => new ProcessManager());
+  const [processManager] = useState(() => ProcessManager.getInstance());
   const [orchestrator] = useState(() => new ModuleOrchestrator(processManager));
   const [dockerExecutor] = useState(() => new DockerExecutor(processManager));
   const [resourceMonitor] = useState(() => new AsyncResourceMonitor());

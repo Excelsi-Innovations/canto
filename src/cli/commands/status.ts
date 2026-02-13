@@ -18,7 +18,7 @@ interface StatusOptions {
 export async function statusCommand(_options: StatusOptions): Promise<void> {
   try {
     const config = await loadConfig();
-    const processManager = new ProcessManager();
+    const processManager = ProcessManager.getInstance();
     const orchestrator = new ModuleOrchestrator(processManager);
     const dockerExecutor = new DockerExecutor(processManager);
 

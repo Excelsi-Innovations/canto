@@ -12,7 +12,7 @@ import { errorBox, successBox } from '../utils/format.js';
 export async function restartCommand(moduleName: string): Promise<void> {
   try {
     const config = await loadConfig();
-    const processManager = new ProcessManager();
+    const processManager = ProcessManager.getInstance();
     const orchestrator = new ModuleOrchestrator(processManager);
 
     orchestrator.load(config);

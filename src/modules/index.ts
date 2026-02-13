@@ -52,7 +52,7 @@ export class ModuleOrchestrator {
    * @param name - Module name
    * @returns Promise resolving to array of process results
    */
-  async start(name: string): Promise<ProcessResult[]> {
+  async start(name: string, options?: { detached?: boolean }): Promise<ProcessResult[]> {
     const module = this.modules.get(name);
     if (!module) {
       throw new Error(`Module '${name}' not found`);
@@ -73,7 +73,7 @@ export class ModuleOrchestrator {
         }
       }
 
-      const result = await this.startModule(moduleName, mod);
+      const result = await this.startModule(moduleName, mod, options);
       results.push(result);
       started.add(moduleName);
     };
@@ -87,7 +87,7 @@ export class ModuleOrchestrator {
    *
    * @returns Promise resolving to array of process results
    */
-  async startAll(): Promise<ProcessResult[]> {
+  async startAll(options?: { detached?: boolean }): Promise<ProcessResult[]> {
     const results: ProcessResult[] = [];
     const started = new Set<string>();
 
@@ -103,7 +103,7 @@ export class ModuleOrchestrator {
         }
       }
 
-      const result = await this.startModule(name, module);
+      const result = await this.startModule(name, module, options);
       results.push(result);
       started.add(name);
     };
@@ -184,7 +184,11 @@ export class ModuleOrchestrator {
     }
   }
 
-  private async startModule(name: string, module: ModuleInstance): Promise<ProcessResult> {
+  private async startModule(
+    name: string,
+    module: ModuleInstance,
+    options?: { detached?: boolean }
+  ): Promise<ProcessResult> {
     const { config } = module;
 
     // Idempotency check: Don't start if already running
@@ -202,11 +206,11 @@ export class ModuleOrchestrator {
 
     switch (config.type) {
       case 'workspace':
-        return this.workspaceExecutor.start(name, config);
+        return this.workspaceExecutor.start(name, config, options);
       case 'docker':
-        return this.dockerExecutor.start(name, config);
+        return this.dockerExecutor.start(name, config, options);
       case 'custom':
-        return this.customExecutor.start(name, config);
+        return this.customExecutor.start(name, config); // Custom executor update needed?
     }
   }
 

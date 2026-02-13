@@ -12,6 +12,7 @@ import { SplashScreen } from '../components/dashboard/SplashScreen.js';
 import { useDashboardData } from '../hooks/useDashboardData.js';
 import { useDashboardInput } from '../hooks/useDashboardInput.js';
 import { createBar } from '../../utils/resources.js';
+import { ModuleDetailsPane } from '../components/dashboard/ModuleDetailsPane.js';
 
 import { ProcessManager } from '../../processes/manager.js';
 
@@ -19,6 +20,17 @@ const DashboardContent: React.FC = () => {
   const { exit } = useApp();
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [selectedModule, setSelectedModule] = useState(0);
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const VISIBLE_ROWS = 8;
+
+  // Scroll Handling
+  useEffect(() => {
+    if (selectedModule < scrollOffset) {
+      setScrollOffset(selectedModule);
+    } else if (selectedModule >= scrollOffset + VISIBLE_ROWS) {
+      setScrollOffset(selectedModule - VISIBLE_ROWS + 1);
+    }
+  }, [selectedModule, scrollOffset, VISIBLE_ROWS]);
 
   // Process Manager for background tasks (Commander)
   // Persists across screen navigation, using Singleton to share state with CLI exit handlers
@@ -73,16 +85,6 @@ const DashboardContent: React.FC = () => {
       const bFav = prefsManager.isFavorite(b.name);
       if (aFav && !bFav) return -1;
       if (!aFav && bFav) return 1;
-
-      const statusPriority: Record<string, number> = {
-        RUNNING: 3,
-        STARTING: 2,
-        STOPPING: 2,
-        STOPPED: 1,
-      };
-      const aPriority = statusPriority[a.status] ?? 0;
-      const bPriority = statusPriority[b.status] ?? 0;
-      if (aPriority !== bPriority) return bPriority - aPriority;
 
       return a.name.localeCompare(b.name);
     });
@@ -271,23 +273,41 @@ const DashboardContent: React.FC = () => {
                       overflow="hidden"
                       minWidth={0}
                     >
-                      {sortedModules.map((module, index) => (
-                        <ModuleRow
-                          key={module.name}
-                          module={module}
-                          isSelected={index === selectedModule}
-                          searchQuery={searchQuery}
-                          isFavorite={prefsManager.isFavorite(module.name)}
-                          isChecked={selectedModules.has(module.name)}
-                          autoRestartState={autoRestartManager.getState(module.name)}
-                          theme={theme}
-                        />
-                      ))}
+                      {sortedModules
+                        .slice(scrollOffset, scrollOffset + VISIBLE_ROWS)
+                        .map((module, index) => (
+                          <ModuleRow
+                            key={module.name}
+                            module={module}
+                            isSelected={index + scrollOffset === selectedModule}
+                            searchQuery={searchQuery}
+                            isFavorite={prefsManager.isFavorite(module.name)}
+                            isChecked={selectedModules.has(module.name)}
+                            autoRestartState={autoRestartManager.getState(module.name)}
+                            theme={theme}
+                          />
+                        ))}
+                      {sortedModules.length > VISIBLE_ROWS && (
+                        <Box marginTop={1} justifyContent="center">
+                          <Text dimColor>
+                            Scroll:{' '}
+                            {Math.round(
+                              (scrollOffset / (sortedModules.length - VISIBLE_ROWS)) * 100
+                            )}
+                            % ({scrollOffset + 1}-
+                            {Math.min(sortedModules.length, scrollOffset + VISIBLE_ROWS)} of{' '}
+                            {sortedModules.length})
+                          </Text>
+                        </Box>
+                      )}
                     </Box>
                   )}
                 </>
               )}
             </Box>
+
+            {/* Module Details Pane (Fixed Layout to prevent list flicker) */}
+            <ModuleDetailsPane module={sortedModules[selectedModule]} theme={theme} />
 
             {/* Unified Status Bar */}
             <Box

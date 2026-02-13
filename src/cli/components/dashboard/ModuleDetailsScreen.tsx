@@ -98,7 +98,7 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
     const [logLines, setLogLines] = useState<string[]>([]);
     const [scrollOffset, setScrollOffset] = useState(0);
     const maxVisibleLines = 15;
-    
+
     const [autoScroll, setAutoScroll] = useState(true);
 
     // Auto-scroll logic
@@ -119,7 +119,7 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
       }
 
       const logPath = join(process.cwd(), 'tmp', 'logs', `${module.name}.log`);
-      
+
       // Reset
       setAutoScroll(true);
       setLogLines([]);
@@ -412,7 +412,9 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
 
         {/* Footer */}
         <Box borderStyle="single" borderColor="gray" padding={1}>
-          <Text dimColor>Press 'b' or ESC to go back • Press 'q' to quit • ↑↓ to scroll logs • 'G' to bottom</Text>
+          <Text dimColor>
+            Press 'b' or ESC to go back • Press 'q' to quit • ↑↓ to scroll logs • 'G' to bottom
+          </Text>
         </Box>
       </Box>
     );

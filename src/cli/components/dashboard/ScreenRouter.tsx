@@ -10,7 +10,7 @@ import { HistoryScreen } from './HistoryScreen.js';
 import { ModuleDetailsScreen } from './ModuleDetailsScreen.js';
 import { CommanderScreen } from './CommanderScreen.js';
 import { SplashScreen } from './SplashScreen.js';
-import { MigrationScreen } from '../migrations/MigrationScreen.js';
+import { DataHubScreen } from '../data-hub/DataHubScreen.js';
 import type { Theme } from '../../../utils/preferences.js';
 
 interface ScreenRouterProps {
@@ -95,7 +95,7 @@ export const ScreenRouter: React.FC<ScreenRouterProps> = ({
   }
 
   if (screen === 'migrations') {
-    return <MigrationScreen cwd={process.cwd()} theme={theme} />;
+    return <DataHubScreen cwd={process.cwd()} theme={theme} onBack={handleBack} />;
   }
 
   if (screen === 'details') {

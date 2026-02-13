@@ -28,7 +28,7 @@ export async function logsCommand(target: string, options: LogsOptions): Promise
 
     // If container name is specified, get Docker container logs
     if (containerName) {
-      const processManager = new ProcessManager();
+      const processManager = ProcessManager.getInstance();
       const orchestrator = new ModuleOrchestrator(processManager);
       const dockerExecutor = new DockerExecutor(processManager);
 

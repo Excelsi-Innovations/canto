@@ -1,4 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { ProcessLogger } from './logger.js';
 import { ProcessStatus, type ProcessInfo, type SpawnOptions, type ProcessResult } from './types.js';
 
@@ -6,6 +8,7 @@ export class ProcessManager {
   private processes: Map<string, ProcessInfo> = new Map();
   private childProcesses: Map<string, ChildProcess> = new Map();
   private loggers: Map<string, ProcessLogger> = new Map();
+  private stateFile: string;
 
   // Log handling
   private outputs: Map<string, string[]> = new Map();
@@ -13,11 +16,65 @@ export class ProcessManager {
 
   private static instance: ProcessManager;
 
+  private constructor() {
+    this.stateFile = join(process.cwd(), '.canto', 'run', 'processes.json');
+    this.loadState();
+  }
+
   public static getInstance(): ProcessManager {
     if (!ProcessManager.instance) {
       ProcessManager.instance = new ProcessManager();
     }
     return ProcessManager.instance;
+  }
+
+  private loadState() {
+    try {
+      if (existsSync(this.stateFile)) {
+        const data = readFileSync(this.stateFile, 'utf-8');
+        const processes = JSON.parse(data) as ProcessInfo[];
+
+        // Verify if processes are actually running
+        processes.forEach((p) => {
+          if (p.status === ProcessStatus.RUNNING && p.pid) {
+            try {
+              // Check if process exists (throws if not)
+              process.kill(p.pid, 0);
+              this.processes.set(p.id, p);
+            } catch {
+              // Process died while Canto was off
+              p.status = ProcessStatus.STOPPED;
+              p.error = 'Process terminated unexpectedly';
+              p.stoppedAt = new Date();
+              this.processes.set(p.id, p);
+            }
+          } else {
+            this.processes.set(p.id, p);
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to load process state:', error);
+    }
+  }
+
+  private saveState() {
+    try {
+      const dir = dirname(this.stateFile);
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+      }
+
+      const data = Array.from(this.processes.values()).map((p) => ({
+        ...p,
+        // Don't serialize onStop as it's a function
+        onStop: undefined,
+      }));
+
+      writeFileSync(this.stateFile, JSON.stringify(data, null, 2));
+    } catch (error) {
+      console.warn('Failed to save process state:', error);
+    }
   }
 
   /**
@@ -57,6 +114,7 @@ export class ProcessManager {
       onExit,
       onData,
       onError,
+      onStop,
     } = options;
 
     if (this.processes.has(id)) {
@@ -78,6 +136,7 @@ export class ProcessManager {
       logFile,
       status: ProcessStatus.STARTING,
       startedAt: new Date(),
+      onStop,
     };
 
     if (logFile) {
@@ -104,85 +163,98 @@ export class ProcessManager {
         cwd: cwd ?? process.cwd(),
         env: env ? { ...process.env, ...env } : process.env,
         shell,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: options.detached ? 'ignore' : ['ignore', 'pipe', 'pipe'],
+        detached: options.detached,
       });
 
-      this.childProcesses.set(id, childProcess);
+      if (options.detached) {
+        childProcess.unref();
+        processInfo.detached = true;
+      } else {
+        this.childProcesses.set(id, childProcess);
+      }
 
       processInfo.pid = childProcess.pid;
       processInfo.status = ProcessStatus.RUNNING;
       this.processes.set(id, processInfo);
+      this.saveState();
 
-      childProcess.stdout?.on('data', (data: Buffer) => {
-        const text = data.toString();
+      if (!options.detached) {
+        childProcess.stdout?.on('data', (data: Buffer) => {
+          const text = data.toString();
 
-        // Store output
-        let buffer = this.outputs.get(id);
-        if (!buffer) {
-          buffer = [];
-          this.outputs.set(id, buffer);
-        }
-        buffer.push(text);
-        if (buffer.length > 2000) buffer.shift(); // Limit history
-
-        // Notify listeners
-        this.listeners.get(id)?.forEach((cb) => cb(text));
-
-        this.loggers.get(id)?.stdout(text, id);
-        if (onData) onData(text);
-      });
-
-      childProcess.stderr?.on('data', (data: Buffer) => {
-        const text = data.toString();
-
-        // Store output (stderr)
-        let buffer = this.outputs.get(id);
-        if (!buffer) {
-          buffer = [];
-          this.outputs.set(id, buffer);
-        }
-        buffer.push(text);
-        if (buffer.length > 2000) buffer.shift();
-
-        // Notify listeners
-        this.listeners.get(id)?.forEach((cb) => cb(text));
-
-        this.loggers.get(id)?.stderr(text, id);
-        if (onError) onError(text);
-      });
-
-      childProcess.on('exit', (code, signal) => {
-        const info = this.processes.get(id);
-        if (info) {
-          info.status = code === 0 ? ProcessStatus.STOPPED : ProcessStatus.FAILED;
-          info.exitCode = code ?? undefined;
-          info.stoppedAt = new Date();
-          if (code !== 0) {
-            info.error = `Process exited with code ${code}`;
+          // Store output
+          let buffer = this.outputs.get(id);
+          if (!buffer) {
+            buffer = [];
+            this.outputs.set(id, buffer);
           }
-          this.processes.set(id, info);
-        }
+          buffer.push(text);
+          if (buffer.length > 2000) buffer.shift(); // Limit history
 
-        this.loggers
-          .get(id)
-          ?.log(`Process exited with code ${code}${signal ? ` (signal: ${signal})` : ''}`, id);
+          // Notify listeners
+          this.listeners.get(id)?.forEach((cb) => cb(text));
 
-        this.childProcesses.delete(id);
+          this.loggers.get(id)?.stdout(text, id);
+          if (onData) onData(text);
+        });
+      }
 
-        if (onExit) onExit(code, signal as NodeJS.Signals | null);
-      });
+      if (!options.detached) {
+        childProcess.stderr?.on('data', (data: Buffer) => {
+          const text = data.toString();
 
-      childProcess.on('error', (error) => {
-        const info = this.processes.get(id);
-        if (info) {
-          info.status = ProcessStatus.FAILED;
-          info.error = error.message;
-          info.stoppedAt = new Date();
-          this.processes.set(id, info);
-        }
+          // Store output (stderr)
+          let buffer = this.outputs.get(id);
+          if (!buffer) {
+            buffer = [];
+            this.outputs.set(id, buffer);
+          }
+          buffer.push(text);
+          if (buffer.length > 2000) buffer.shift();
 
-        this.loggers.get(id)?.log(`Process error: ${error.message}`, id);
-      });
+          // Notify listeners
+          this.listeners.get(id)?.forEach((cb) => cb(text));
+
+          this.loggers.get(id)?.stderr(text, id);
+          if (onError) onError(text);
+        });
+
+        childProcess.on('exit', (code, signal) => {
+          const info = this.processes.get(id);
+          if (info) {
+            info.status = code === 0 ? ProcessStatus.STOPPED : ProcessStatus.FAILED;
+            info.exitCode = code ?? undefined;
+            info.stoppedAt = new Date();
+            if (code !== 0) {
+              info.error = `Process exited with code ${code}`;
+            }
+            this.processes.set(id, info);
+            this.saveState();
+          }
+
+          this.loggers
+            .get(id)
+            ?.log(`Process exited with code ${code}${signal ? ` (signal: ${signal})` : ''}`, id);
+
+          this.childProcesses.delete(id);
+
+          if (onExit) onExit(code, signal as NodeJS.Signals | null);
+        });
+
+        childProcess.on('error', (error) => {
+          const info = this.processes.get(id);
+          if (info) {
+            info.status = ProcessStatus.FAILED;
+            info.error = error.message;
+            info.stoppedAt = new Date();
+            this.processes.set(id, info);
+            this.saveState();
+          }
+
+          this.loggers.get(id)?.log(`Process error: ${error.message}`, id);
+        });
+      }
 
       return {
         success: true,
@@ -234,17 +306,50 @@ export class ProcessManager {
       };
     }
 
+    // Handle detached processes
+    if (processInfo.detached && processInfo.pid) {
+      if (!this.childProcesses.has(id)) {
+        // It's a restored detached process
+        try {
+          // Check if running
+          process.kill(processInfo.pid, 0);
+          // Kill it
+          process.kill(processInfo.pid, signal);
+
+          processInfo.status = ProcessStatus.STOPPED;
+          processInfo.stoppedAt = new Date();
+          this.processes.set(id, processInfo);
+          this.saveState();
+
+          return {
+            success: true,
+            processInfo,
+          };
+        } catch (_e) {
+          // Process already dead
+          processInfo.status = ProcessStatus.STOPPED;
+          processInfo.error = 'Process was already dead';
+          this.processes.set(id, processInfo);
+          this.saveState();
+          return { success: true, processInfo };
+        }
+      }
+    }
+
     const childProcess = this.childProcesses.get(id);
     if (!childProcess) {
+      // Should have been handled above if detached?
+      // If not detached and not in map, it's weird.
       return {
         success: false,
         processInfo,
-        error: `Child process ${id} not found`,
+        error: `Child process ${id} not found locally`,
       };
     }
 
     processInfo.status = ProcessStatus.STOPPING;
     this.processes.set(id, processInfo);
+    this.saveState();
 
     this.loggers.get(id)?.log(`Stopping process with signal ${signal}`, id);
 
@@ -256,9 +361,26 @@ export class ProcessManager {
         }
       }, 5000);
 
-      childProcess.once('exit', () => {
+      childProcess.once('exit', async () => {
         clearTimeout(timeout);
+
+        // Run cleanup hook if present (only works for attached/live processes)
+        if (processInfo.onStop) {
+          try {
+            await processInfo.onStop();
+          } catch (err) {
+            this.loggers.get(id)?.log(`Process cleanup failed: ${err}`, id);
+          }
+        }
+
         const updatedInfo = this.processes.get(id);
+        if (updatedInfo) {
+          updatedInfo.status = ProcessStatus.STOPPED;
+          updatedInfo.stoppedAt = new Date();
+          this.processes.set(id, updatedInfo);
+          this.saveState();
+        }
+
         resolve({
           success: true,
           processInfo: updatedInfo ?? processInfo,
@@ -344,8 +466,24 @@ export class ProcessManager {
    * @returns True if process is running, false otherwise
    */
   isRunning(id: string): boolean {
-    const process = this.processes.get(id);
-    return process?.status === ProcessStatus.RUNNING;
+    const proc = this.processes.get(id);
+    if (proc?.status !== ProcessStatus.RUNNING) return false;
+
+    if (proc.pid) {
+      try {
+        // Check if actually running
+        process.kill(proc.pid, 0);
+        return true;
+      } catch {
+        // Update status if died
+        proc.status = ProcessStatus.STOPPED;
+        proc.error = 'Process died';
+        this.processes.set(id, proc);
+        this.saveState();
+        return false;
+      }
+    }
+    return false;
   }
 
   /**

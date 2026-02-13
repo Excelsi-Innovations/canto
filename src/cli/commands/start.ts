@@ -135,7 +135,7 @@ export async function startCommand(modules: string[], options: StartOptions): Pr
       }
     }
 
-    const processManager = new ProcessManager();
+    const processManager = ProcessManager.getInstance();
     const orchestrator = new ModuleOrchestrator(processManager);
 
     orchestrator.load(config);
@@ -177,11 +177,11 @@ export async function startCommand(modules: string[], options: StartOptions): Pr
     const results = [];
 
     if (options.all || modules.length === 0) {
-      const allResults = await orchestrator.startAll();
+      const allResults = await orchestrator.startAll({ detached: true });
       results.push(...allResults);
     } else {
       for (const name of modulesToStart) {
-        const moduleResults = await orchestrator.start(name);
+        const moduleResults = await orchestrator.start(name, { detached: true });
         results.push(...moduleResults);
       }
     }

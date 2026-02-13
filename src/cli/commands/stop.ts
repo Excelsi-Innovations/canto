@@ -16,7 +16,7 @@ interface StopOptions {
 export async function stopCommand(modules: string[], options: StopOptions): Promise<void> {
   try {
     const config = await loadConfig();
-    const processManager = new ProcessManager();
+    const processManager = ProcessManager.getInstance();
     const orchestrator = new ModuleOrchestrator(processManager);
 
     orchestrator.load(config);

@@ -24,7 +24,7 @@ export class DependencyManager {
 
   constructor() {
     this.cachePath = join(process.cwd(), CACHE_DIR, HASH_FILE);
-    this.processManager = new ProcessManager();
+    this.processManager = ProcessManager.getInstance();
     this.ensureCacheDir();
     this.loadCache();
   }

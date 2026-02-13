@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { ModuleStatus } from '../../types.js';
-import { formatMemory, createBar } from '../../../utils/resources.js';
+// import { formatMemory, createBar } from '../../../utils/resources.js';
 import { getAlertIcon, getAlertColor } from '../../lib/resource-alerts.js';
 import type { ModuleRestartState } from '../../lib/auto-restart-manager.js';
 import { getStatusConfig, getAutoRestartInfo, getModuleAlert } from './ModuleStatusUtils.js';
@@ -126,70 +126,6 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
             {autoRestartInfo?.isRestarting && <Text color="yellow"> ⟳</Text>}
           </Box>
         </Box>
-
-        {/* Resource Row */}
-        <Box marginLeft={2}>
-          {module.pid && (
-            <>
-              <Text dimColor> PID {module.pid}</Text>
-              {module.cpu !== undefined && <Text dimColor> • CPU {module.cpu.toFixed(1)}%</Text>}
-              {module.memory !== undefined && (
-                <Text dimColor> • RAM {formatMemory(module.memory)}</Text>
-              )}
-            </>
-          )}
-        </Box>
-
-        {/* Show performance metrics if selected and module is running */}
-        {isSelected && module.pid && (
-          <Box marginLeft={4} marginTop={1} flexDirection="column">
-            {module.cpu !== undefined && (
-              <Text dimColor>
-                CPU: {createBar(module.cpu, 100, 10)} {module.cpu.toFixed(1)}%
-              </Text>
-            )}
-            {module.memory !== undefined && (
-              <Text dimColor>
-                RAM: {createBar(module.memory, 1024 * 1024 * 1024, 10)}{' '}
-                {formatMemory(module.memory)}
-              </Text>
-            )}
-          </Box>
-        )}
-
-        {/* Show Docker containers if selected and available */}
-        {isSelected && module.containers && module.containers.length > 0 && (
-          <Box marginLeft={4} marginTop={1} flexDirection="column">
-            {module.containers.map((container) => (
-              <Box key={container.name} marginBottom={0}>
-                <Text dimColor>
-                  {'├─ '}
-                  <Text color={container.status === 'running' ? 'green' : 'gray'}>
-                    {container.status === 'running' ? '●' : '○'}
-                  </Text>{' '}
-                  {container.name}
-                  {container.health && (
-                    <Text
-                      color={
-                        container.health === 'healthy'
-                          ? 'green'
-                          : container.health === 'unhealthy'
-                            ? 'red'
-                            : 'yellow'
-                      }
-                    >
-                      {' '}
-                      ({container.health})
-                    </Text>
-                  )}
-                  {container.ports.length > 0 && (
-                    <Text color="cyan"> {container.ports.join(', ')}</Text>
-                  )}
-                </Text>
-              </Box>
-            ))}
-          </Box>
-        )}
       </Box>
     );
   },

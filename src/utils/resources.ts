@@ -3,6 +3,7 @@ import { platform } from 'os';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+let cachedTotalMemory = 0;
 
 /**
  * Process resource usage information
@@ -45,12 +46,19 @@ export async function getProcessResources(pid: number): Promise<ProcessResources
       const data = JSON.parse(output);
       const memoryMB = data.WorkingSet / (1024 * 1024);
 
-      // Get total memory for percentage calculation
-      const { stdout: totalMemOutput } = await execAsync(
-        'powershell "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory"',
-        { encoding: 'utf-8' }
-      );
-      const totalMemory = parseInt(totalMemOutput.trim()) / (1024 * 1024);
+      let totalMemory = 0;
+      if (cachedTotalMemory > 0) {
+        totalMemory = cachedTotalMemory;
+      } else {
+        // Get total memory (cached)
+        const { stdout: totalMemOutput } = await execAsync(
+          'powershell "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory"',
+          { encoding: 'utf-8' }
+        );
+        cachedTotalMemory = parseInt(totalMemOutput.trim()) / (1024 * 1024);
+        totalMemory = cachedTotalMemory;
+      }
+
       const memoryPercent = (memoryMB / totalMemory) * 100;
 
       return {
