@@ -21,8 +21,8 @@ const DashboardContent: React.FC = () => {
   const [selectedModule, setSelectedModule] = useState(0);
 
   // Process Manager for background tasks (Commander)
-  // Persists across screen navigation
-  const processManager = useMemo(() => new ProcessManager(), []);
+  // Persists across screen navigation, using Singleton to share state with CLI exit handlers
+  const processManager = useMemo(() => ProcessManager.getInstance(), []);
 
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -366,30 +366,45 @@ const DashboardContent: React.FC = () => {
               </Box>
             )}
 
-            {/* Confirmation Modal */}
+            {/* Confirmation Modal - Bottom Position */}
             {confirmAction && (
-              <Box borderStyle="double" borderColor="yellow" padding={2} marginTop={1}>
-                <Box flexDirection="column">
+              <Box
+                position="absolute"
+                width="100%"
+                height="100%"
+                flexDirection="column"
+                justifyContent="flex-end"
+                alignItems="center"
+              >
+                <Box
+                  width="100%"
+                  height={8}
+                  borderStyle="double"
+                  borderColor="yellow"
+                  flexDirection="column"
+                  alignItems="center"
+                  justifyContent="center"
+                  backgroundColor={theme.colors.background}
+                >
                   <Text bold color="yellow">
-                    ⚠ Confirm Action
+                    ⚠️ Confirm Action
                   </Text>
-                  <Box marginTop={1}>
+                  <Box marginTop={0}>
                     {confirmAction.action.startsWith('bulk-') ? (
                       <Text>
                         Are you sure you want to{' '}
-                        <Text bold color={confirmAction.action.includes('stop') ? 'red' : 'yellow'}>
+                        <Text bold color={confirmAction.action.includes('stop') ? 'red' : 'green'}>
                           {confirmAction.action.replace('bulk-', '')}
                         </Text>{' '}
                         <Text bold color="cyan">
-                          {confirmAction.moduleNames?.length ?? 0} module
-                          {(confirmAction.moduleNames?.length ?? 0) > 1 ? 's' : ''}
+                          ALL {confirmAction.moduleNames?.length ?? 0} selected modules
                         </Text>
                         ?
                       </Text>
                     ) : (
                       <Text>
                         Are you sure you want to{' '}
-                        <Text bold color={confirmAction.action === 'stop' ? 'red' : 'yellow'}>
+                        <Text bold color={confirmAction.action === 'stop' ? 'red' : 'green'}>
                           {confirmAction.action}
                         </Text>{' '}
                         <Text bold color="cyan">
@@ -401,7 +416,14 @@ const DashboardContent: React.FC = () => {
                   </Box>
                   <Box marginTop={1}>
                     <Text dimColor>
-                      <Text color="green">[Y]</Text> Confirm • <Text color="red">[N]</Text> Cancel
+                      <Text color="green" bold>
+                        [Y]
+                      </Text>{' '}
+                      Confirm •{' '}
+                      <Text color="red" bold>
+                        [N]
+                      </Text>{' '}
+                      Cancel
                     </Text>
                   </Box>
                 </Box>
@@ -451,9 +473,17 @@ export async function dashboardCommand(): Promise<void> {
   process.stdout.write('\x1b[?25l');
 
   let cleanupCalled = false;
-  const cleanup = () => {
+  const cleanup = async () => {
     if (cleanupCalled) return;
     cleanupCalled = true;
+
+    // Gracefully stop all child processes
+    try {
+      await ProcessManager.getInstance().stopAll();
+    } catch {
+      // ignore
+    }
+
     // Show cursor
     process.stdout.write('\x1b[?25h');
     // Leave alternate screen buffer
@@ -465,8 +495,8 @@ export async function dashboardCommand(): Promise<void> {
   };
 
   // Ensure cleanup on exit signals
-  const exitHandler = () => {
-    cleanup();
+  const exitHandler = async () => {
+    await cleanup();
     process.exit(0);
   };
 
@@ -479,10 +509,10 @@ export async function dashboardCommand(): Promise<void> {
   } catch {
     // Dashboard exited with error — cleanup handles it
   } finally {
-    cleanup();
-    // Force exit after 100ms if cleanup is slow
+    await cleanup();
+    // Force exit after 500ms if cleanup is slow
     setTimeout(() => {
       process.exit(0);
-    }, 100);
+    }, 500);
   }
 }

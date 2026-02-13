@@ -97,7 +97,24 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
 
           {/* Type - flexible width */}
           <Box flexBasis={12} flexShrink={0} marginLeft={1} overflow="hidden">
-            <Text wrap="truncate-end">{module.type}</Text>
+            <Text wrap="truncate-end" color="gray">
+              {module.type}
+            </Text>
+          </Box>
+
+          {/* Status Text - explicit state */}
+          <Box flexBasis={12} flexShrink={0} marginLeft={1} overflow="hidden">
+            <Text
+              color={
+                module.status === 'RUNNING'
+                  ? 'green'
+                  : module.status === 'STOPPED'
+                    ? 'gray'
+                    : 'yellow'
+              }
+            >
+              {autoRestartInfo?.isRestarting ? 'RESTARTING' : module.status}
+            </Text>
           </Box>
 
           {/* Badges/Alerts - flexible width */}
@@ -151,6 +168,20 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
                     {container.status === 'running' ? '●' : '○'}
                   </Text>{' '}
                   {container.name}
+                  {container.health && (
+                    <Text
+                      color={
+                        container.health === 'healthy'
+                          ? 'green'
+                          : container.health === 'unhealthy'
+                            ? 'red'
+                            : 'yellow'
+                      }
+                    >
+                      {' '}
+                      ({container.health})
+                    </Text>
+                  )}
                   {container.ports.length > 0 && (
                     <Text color="cyan"> {container.ports.join(', ')}</Text>
                   )}

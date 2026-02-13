@@ -1,3 +1,7 @@
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+
 type ShutdownHandler = () => void | Promise<void>;
 
 const SHUTDOWN_SIGNALS: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
@@ -36,7 +40,6 @@ export class SignalHandler {
 
     // Windows doesn't properly emit SIGINT, requires readline workaround
     if (process.platform === 'win32') {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const readline = require('readline');
       const rl = readline.createInterface({
         input: process.stdin,

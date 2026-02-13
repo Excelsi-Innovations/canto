@@ -35,6 +35,15 @@ process.on('unhandledRejection', (reason: unknown) => {
 // Graceful shutdown on SIGINT/SIGTERM
 process.on('SIGINT', async () => {
   console.log(pc.cyan('\n\n👋 Canto shutting down gracefully...\n'));
+
+  // Stop all running processes
+  const { ProcessManager } = await import('../processes/manager.js');
+  try {
+    await ProcessManager.getInstance().stopAll();
+  } catch {
+    // ignore
+  }
+
   const { shutdownPreferencesManager } = await import('../utils/preferences-manager.js');
   await shutdownPreferencesManager();
   process.exit(0);
@@ -42,6 +51,15 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   console.log(pc.cyan('\n\n👋 Canto shutting down gracefully...\n'));
+
+  // Stop all running processes
+  const { ProcessManager } = await import('../processes/manager.js');
+  try {
+    await ProcessManager.getInstance().stopAll();
+  } catch {
+    // ignore
+  }
+
   const { shutdownPreferencesManager } = await import('../utils/preferences-manager.js');
   await shutdownPreferencesManager();
   process.exit(0);

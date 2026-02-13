@@ -19,7 +19,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "dev": "tsx --watch src/cli/index.ts",
+    "dev": "bun --watch src/cli/index.ts",
     "build": "tsc && chmod +x bin/canto.js",
     "test": "bun test --timeout=30000",
     "test:watch": "bun test --watch",
@@ -29,13 +29,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\"",
     "type-check": "tsc --noEmit",
-    "validate": "npm run type-check && npm run lint && npm run format:check",
-    "prepublishOnly": "npm run validate && npm run build",
-    "bun:dev": "bun --watch src/cli/index.ts",
-    "bun:build": "bun build src/cli/index.ts --outdir dist/cli --target node --sourcemap=external --minify",
-    "bun:install": "bun install",
-    "bun:test": "bun test --timeout=30000",
-    "bun:validate": "bun run type-check && bun run lint && bun run format:check"
+    "validate": "bun run type-check && bun run lint && bun run format:check",
+    "prepublishOnly": "bun run validate && bun run build"
   },
   "keywords": [
     "cli",

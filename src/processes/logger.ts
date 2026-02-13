@@ -67,7 +67,7 @@ export class ProcessLogger {
    */
   stderr(data: string, prefix?: string): void {
     const lines = data.toString().split('\n').filter(Boolean);
-    lines.forEach((line) => this.log(`[ERROR] ${line}`, prefix));
+    lines.forEach((line) => this.log(`[STDERR] ${line}`, prefix));
   }
 
   /**

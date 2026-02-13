@@ -18,6 +18,10 @@ build/
 coverage/
 *.lcov
 .nyc_output
+test.env
+test.env.example
+test-hash.txt
+*.txt
 
 # Environment
 .env
@@ -47,3 +51,4 @@ temp/
 # OS
 .DS_Store
 Thumbs.db
+

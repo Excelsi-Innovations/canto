@@ -1,7 +1,7 @@
 import type { ProcessManager } from '../processes/manager.js';
 import type { CustomModule } from '../config/schema.js';
 import type { ProcessResult } from '../processes/types.js';
-import { resolve } from 'path';
+import { resolve, join } from 'path';
 
 /**
  * Execute custom shell commands
@@ -29,6 +29,7 @@ export class CustomExecutor {
       command: config.command,
       cwd,
       env: config.env as Record<string, string> | undefined,
+      logFile: join(process.cwd(), 'tmp', 'logs', `${id}.log`),
     });
   }
 

@@ -1,16 +1,23 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { diffEnvFiles } from '../../../src/utils/env-diff';
-import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { writeFileSync, unlinkSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 describe('env-diff utility', () => {
-  const envFile = join(process.cwd(), 'test.env');
-  const exampleFile = join(process.cwd(), 'test.env.example');
+  let tempDir: string;
+  let envFile: string;
+  let exampleFile: string;
 
-  const cleanup = () => {
-    if (existsSync(envFile)) unlinkSync(envFile);
-    if (existsSync(exampleFile)) unlinkSync(exampleFile);
-  };
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'env-diff-test-'));
+    envFile = join(tempDir, 'test.env');
+    exampleFile = join(tempDir, 'test.env.example');
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
 
   it('should identify missing keys', () => {
     writeFileSync(envFile, 'EXISTING=1\n');
@@ -21,8 +28,6 @@ describe('env-diff utility', () => {
     expect(result.missingKeys).toEqual(['MISSING_1', 'MISSING_2']);
     expect(result.currentKeys).toContain('EXISTING');
     expect(result.exampleKeys).toContain('MISSING_1');
-    
-    cleanup();
   });
 
   it('should return empty list when no keys missing', () => {
@@ -32,13 +37,13 @@ describe('env-diff utility', () => {
     const result = diffEnvFiles(envFile, exampleFile);
 
     expect(result.missingKeys).toHaveLength(0);
-    
-    cleanup();
   });
 
   it('should handle missing files gracefully', () => {
-    cleanup(); // Ensure files don't exist
-    const result = diffEnvFiles(envFile, exampleFile);
+    const result = diffEnvFiles(
+      join(tempDir, 'nonexistent.env'),
+      join(tempDir, 'nonexistent.env.example'),
+    );
     expect(result.missingKeys).toHaveLength(0);
   });
 });

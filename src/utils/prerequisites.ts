@@ -1,4 +1,7 @@
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 /**
  * Check if a command exists in the system PATH
@@ -6,13 +9,10 @@ import { execSync } from 'child_process';
  * @param command - Command name to check
  * @returns True if command exists, false otherwise
  */
-export function commandExists(command: string): boolean {
+export async function commandExists(command: string): Promise<boolean> {
   try {
-    if (process.platform === 'win32') {
-      execSync(`where ${command}`, { stdio: 'ignore' });
-    } else {
-      execSync(`which ${command}`, { stdio: 'ignore' });
-    }
+    const cmd = process.platform === 'win32' ? `where ${command}` : `which ${command}`;
+    await execAsync(cmd);
     return true;
   } catch {
     return false;
@@ -26,13 +26,13 @@ export function commandExists(command: string): boolean {
  * @param versionFlag - Flag to get version (default: --version)
  * @returns Version string or null if not available
  */
-export function getCommandVersion(command: string, versionFlag = '--version'): string | null {
+export async function getCommandVersion(
+  command: string,
+  versionFlag = '--version'
+): Promise<string | null> {
   try {
-    const output = execSync(`${command} ${versionFlag}`, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    return output.trim();
+    const { stdout } = await execAsync(`${command} ${versionFlag}`);
+    return stdout.trim();
   } catch {
     return null;
   }
@@ -43,17 +43,21 @@ export function getCommandVersion(command: string, versionFlag = '--version'): s
  *
  * @returns Object with installed and running status
  */
-export function checkDocker(): { installed: boolean; running: boolean; version: string | null } {
-  const installed = commandExists('docker');
+export async function checkDocker(): Promise<{
+  installed: boolean;
+  running: boolean;
+  version: string | null;
+}> {
+  const installed = await commandExists('docker');
 
   if (!installed) {
     return { installed: false, running: false, version: null };
   }
 
-  const version = getCommandVersion('docker', '--version');
+  const version = await getCommandVersion('docker', '--version');
 
   try {
-    execSync('docker ps', { stdio: 'ignore' });
+    await execAsync('docker ps');
     return { installed: true, running: true, version };
   } catch {
     return { installed: true, running: false, version };
@@ -65,19 +69,19 @@ export function checkDocker(): { installed: boolean; running: boolean; version: 
  *
  * @returns Object with installed status and which variant
  */
-export function checkDockerCompose(): {
+export async function checkDockerCompose(): Promise<{
   installed: boolean;
   variant: 'v2' | 'v1' | null;
   version: string | null;
-} {
+}> {
   try {
-    execSync('docker compose version', { stdio: 'ignore' });
-    const version = getCommandVersion('docker', 'compose version');
+    await execAsync('docker compose version');
+    const version = await getCommandVersion('docker', 'compose version');
     return { installed: true, variant: 'v2', version };
   } catch {
     try {
-      execSync('docker-compose --version', { stdio: 'ignore' });
-      const version = getCommandVersion('docker-compose', '--version');
+      await execAsync('docker-compose --version');
+      const version = await getCommandVersion('docker-compose', '--version');
       return { installed: true, variant: 'v1', version };
     } catch {
       return { installed: false, variant: null, version: null };
@@ -122,40 +126,53 @@ export function checkNodeVersion(minVersion?: string): {
  * @param requirements - Requirements object from config
  * @returns Object with all prerequisite check results
  */
-export function checkPrerequisites(requirements?: {
+export async function checkPrerequisites(requirements?: {
   docker?: boolean;
   dockerCompose?: boolean;
   node?: string;
-}): {
-  docker?: ReturnType<typeof checkDocker>;
-  dockerCompose?: ReturnType<typeof checkDockerCompose>;
+}): Promise<{
+  docker?: Awaited<ReturnType<typeof checkDocker>>;
+  dockerCompose?: Awaited<ReturnType<typeof checkDockerCompose>>;
   node?: ReturnType<typeof checkNodeVersion>;
   allMet: boolean;
-} {
-  const results: ReturnType<typeof checkPrerequisites> = {
+}> {
+  const results: Awaited<ReturnType<typeof checkPrerequisites>> = {
     allMet: true,
   };
 
+  const promises: Promise<void>[] = [];
+
   if (requirements?.docker) {
-    results.docker = checkDocker();
-    if (!results.docker.installed || !results.docker.running) {
-      results.allMet = false;
-    }
+    promises.push(
+      checkDocker().then((res) => {
+        results.docker = res;
+        if (!res.installed || !res.running) {
+          results.allMet = false;
+        }
+      })
+    );
   }
 
   if (requirements?.dockerCompose) {
-    results.dockerCompose = checkDockerCompose();
-    if (!results.dockerCompose.installed) {
-      results.allMet = false;
-    }
+    promises.push(
+      checkDockerCompose().then((res) => {
+        results.dockerCompose = res;
+        if (!res.installed) {
+          results.allMet = false;
+        }
+      })
+    );
   }
 
   if (requirements?.node) {
+    // Node check is sync
     results.node = checkNodeVersion(requirements.node);
     if (!results.node.meetsRequirement) {
       results.allMet = false;
     }
   }
+
+  await Promise.all(promises);
 
   return results;
 }
@@ -165,7 +182,9 @@ export function checkPrerequisites(requirements?: {
  *
  * @param results - Results from checkPrerequisites
  */
-export function printPrerequisitesReport(results: ReturnType<typeof checkPrerequisites>): void {
+export function printPrerequisitesReport(
+  results: Awaited<ReturnType<typeof checkPrerequisites>>
+): void {
   console.log('\n📋 Prerequisites Check\n');
 
   if (results.docker) {

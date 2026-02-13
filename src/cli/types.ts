@@ -8,11 +8,13 @@ export interface ModuleStatus {
   status: 'RUNNING' | 'STOPPED' | 'STARTING' | 'STOPPING' | 'ERROR';
   pid?: number;
   uptime?: number;
+  startedAt?: Date;
   cpu?: number;
   memory?: number;
   containers?: Array<{
     name: string;
     status: string;
+    health?: string;
     ports: string[];
   }>;
 }

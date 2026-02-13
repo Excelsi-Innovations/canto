@@ -1,7 +1,7 @@
 import type { ProcessManager } from '../processes/manager.js';
 import type { WorkspaceModule } from '../config/schema.js';
 import type { ProcessResult } from '../processes/types.js';
-import { resolve } from 'path';
+import { resolve, join } from 'path';
 
 /**
  * Execute workspace-based modules (npm/pnpm/yarn/bun projects)
@@ -35,6 +35,7 @@ export class WorkspaceExecutor {
       command,
       cwd,
       env: config.env as Record<string, string> | undefined,
+      logFile: join(process.cwd(), 'tmp', 'logs', `${id}.log`),
     });
   }
 

@@ -22,7 +22,7 @@ export class AsyncResourceMonitor {
 
   constructor(config: Partial<ResourceMonitorConfig> = {}) {
     this.config = {
-      updateInterval: 2000,
+      updateInterval: 3000,
       enableCPU: true,
       enableMemory: true,
       ...config,

@@ -25,7 +25,7 @@ export async function checkCommand(): Promise<void> {
       return;
     }
 
-    const results = checkPrerequisites(config.global.prerequisites);
+    const results = await checkPrerequisites(config.global.prerequisites);
     const allPassed = results.allMet;
 
     printPrerequisitesReport(results);

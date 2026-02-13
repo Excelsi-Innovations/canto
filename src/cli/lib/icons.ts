@@ -80,6 +80,7 @@ export function getModuleIcon(type: string, name?: string): string {
  * Get icon for status
  */
 export function getStatusIcon(status: string): string {
+  if (!status || typeof status !== 'string') return '?';
   return STATUS_ICONS[status.toUpperCase()] ?? '?';
 }
 
@@ -101,6 +102,10 @@ export function getStatusDisplay(status: string): {
     STOPPING: { icon: '◑', label: 'Stopping', color: 'yellow' },
     ERROR: { icon: '✗', label: 'Error', color: 'red' },
   };
+
+  if (!status || typeof status !== 'string') {
+    return { icon: '?', label: String(status || 'Unknown'), color: 'gray' };
+  }
 
   return statusMap[status.toUpperCase()] ?? { icon: '?', label: status, color: 'gray' };
 }

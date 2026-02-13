@@ -187,6 +187,19 @@ export class ModuleOrchestrator {
   private async startModule(name: string, module: ModuleInstance): Promise<ProcessResult> {
     const { config } = module;
 
+    // Idempotency check: Don't start if already running
+    if (this.processManager.isRunning(name)) {
+      // Return a success result with existing process info
+      const existing = this.processManager.getProcess(name);
+      if (existing) {
+        return {
+          success: true,
+          processInfo: existing,
+          error: 'Module is already running', // usage as info message
+        };
+      }
+    }
+
     switch (config.type) {
       case 'workspace':
         return this.workspaceExecutor.start(name, config);
