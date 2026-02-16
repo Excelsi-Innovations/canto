@@ -8,9 +8,7 @@ import {
   getPathSeparator,
   isWSL,
   getTerminalType,
-  supports256Colors,
-  getRenderingHints,
-  Platform,
+  _test_setPlatform,
 } from '../../../src/utils/platform.js';
 import { execSync } from 'node:child_process';
 import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
@@ -23,25 +21,20 @@ mock.module('node:child_process', () => ({
 }));
 
 describe('platform utilities', () => {
-  const originalPlatform = process.platform;
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
     (execSync as any).mockClear();
+    _test_setPlatform(undefined); // Reset
   });
 
   afterEach(() => {
-    Object.defineProperty(process, 'platform', {
-      value: originalPlatform,
-      configurable: true,
-    });
+    _test_setPlatform(undefined);
     process.env = { ...originalEnv };
   });
 
   it('should detect Windows platform', () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'win32',
-    });
+    _test_setPlatform('win32');
     expect(detectPlatform()).toBe('windows');
     expect(isWindows()).toBe(true);
     expect(isMacOS()).toBe(false);
@@ -49,9 +42,7 @@ describe('platform utilities', () => {
   });
 
   it('should detect macOS platform', () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'darwin',
-    });
+    _test_setPlatform('darwin');
     expect(detectPlatform()).toBe('macos');
     expect(isWindows()).toBe(false);
     expect(isMacOS()).toBe(true);
@@ -59,9 +50,7 @@ describe('platform utilities', () => {
   });
 
   it('should detect Linux platform', () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'linux',
-    });
+    _test_setPlatform('linux');
     expect(detectPlatform()).toBe('linux');
     expect(isWindows()).toBe(false);
     expect(isMacOS()).toBe(false);
@@ -69,9 +58,7 @@ describe('platform utilities', () => {
   });
 
   it('should detect unknown platform', () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'android', // An example of an unknown platform
-    });
+    _test_setPlatform('android'); // An example of an unknown platform
     expect(detectPlatform()).toBe('unknown');
     expect(isWindows()).toBe(false);
     expect(isMacOS()).toBe(false);

@@ -1,11 +1,6 @@
 import { mock } from 'bun:test';
 import { EventEmitter } from 'node:events';
 
-// Mock utils/platform BEFORE importing terminateProcess
-mock.module('../../../src/utils/platform.js', () => ({
-  isWindows: mock(() => false),
-}));
-
 // Mock child_process.exec
 mock.module('child_process', () => ({
   exec: mock((cmd, cb) => {
@@ -13,10 +8,10 @@ mock.module('child_process', () => ({
   }),
 }));
 
-import { describe, it, expect, beforeEach, spyOn } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import { terminateProcess } from '../../../src/processes/manager/killing.js';
 import { ProcessStatus, type ProcessInfo } from '../../../src/processes/types.js';
-import { isWindows } from '../../../src/utils/platform.js';
+import { isWindows, _test_setPlatform } from '../../../src/utils/platform.js';
 
 describe('terminateProcess', () => {
   let mockChildProcess: any;
@@ -41,11 +36,15 @@ describe('terminateProcess', () => {
     };
     
     // Default to non-windows
-    (isWindows as any).mockImplementation(() => false);
+    _test_setPlatform('linux');
+  });
+
+  afterEach(() => {
+    _test_setPlatform(undefined);
   });
 
   it('should terminate a running child process (Unix)', async () => {
-    (isWindows as any).mockImplementation(() => false);
+    _test_setPlatform('linux');
 
     // Asynchronously emit exit to simulate process finishing
     setTimeout(() => {
@@ -60,7 +59,7 @@ describe('terminateProcess', () => {
   });
 
   it('should use taskkill on Windows', async () => {
-    (isWindows as any).mockImplementation(() => true);
+    _test_setPlatform('win32');
     
     // We need to verify exec is called, but we can't easily spy on the internal exec import.
     // However, we know if isWindows is true, it calls exec.

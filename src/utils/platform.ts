@@ -13,9 +13,7 @@ export type Platform = 'windows' | 'linux' | 'macos' | 'unknown';
  * @returns Platform identifier
  */
 export function detectPlatform(): Platform {
-  const { platform } = process;
-
-  switch (platform) {
+  switch (getRawPlatform()) {
     case 'win32':
       return 'windows';
     case 'darwin':
@@ -27,31 +25,44 @@ export function detectPlatform(): Platform {
   }
 }
 
+let platformOverride: string | undefined;
+
+export function _test_setPlatform(platform: string | undefined) {
+  platformOverride = platform;
+}
+
+export function getRawPlatform(): string {
+  return platformOverride ?? process.platform;
+}
+
 /**
  * Check if running on Windows
  *
  * @returns True if Windows, false otherwise
+ * @internal
  */
 export function isWindows(): boolean {
-  return process.platform === 'win32';
+  return getRawPlatform() === 'win32';
 }
 
 /**
  * Check if running on macOS
  *
  * @returns True if macOS, false otherwise
+ * @internal
  */
 export function isMacOS(): boolean {
-  return process.platform === 'darwin';
+  return getRawPlatform() === 'darwin';
 }
 
 /**
  * Check if running on Linux
  *
  * @returns True if Linux, false otherwise
+ * @internal
  */
 export function isLinux(): boolean {
-  return process.platform === 'linux';
+  return getRawPlatform() === 'linux';
 }
 
 /**
