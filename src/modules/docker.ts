@@ -1,9 +1,8 @@
 import type { ProcessManager } from '../processes/manager.js';
 import type { DockerModule } from '../config/schema.js';
 import type { ProcessResult } from '../processes/types.js';
-import { execSync } from 'child_process';
 import { resolve, dirname, join } from 'path';
-import { existsSync, readFileSync } from 'fs';
+import { readFile, stat } from 'node:fs/promises'; // For async file reads and existence check
 import dotenv from 'dotenv';
 import {
   detectDockerCompose,
@@ -11,6 +10,7 @@ import {
   getServicesContainers,
   type DockerContainer,
   type DockerComposeService,
+  runCommand, // Import runCommand
 } from '../utils/docker.js';
 
 type DockerComposeCommand = 'docker compose' | 'docker-compose';
@@ -21,11 +21,14 @@ type DockerComposeCommand = 'docker compose' | 'docker-compose';
  */
 export class DockerExecutor {
   private processManager: ProcessManager;
-  private composeCommand: DockerComposeCommand;
+  private composeCommand: DockerComposeCommand | null = null; // Initialize as null
 
   constructor(processManager: ProcessManager) {
     this.processManager = processManager;
-    this.composeCommand = detectDockerCompose();
+  }
+
+  async initialize(): Promise<void> {
+    this.composeCommand = await detectDockerCompose();
   }
 
   /**
@@ -45,23 +48,30 @@ export class DockerExecutor {
     const services = config.services?.join(' ') ?? '';
     const profiles = config.profiles?.map((p) => `--profile ${p}`).join(' ') ?? '';
 
+    // Await the composeCommand promise
+    const { composeCommand } = this;
+    if (!composeCommand) {
+      throw new Error('DockerExecutor not initialized. Call initialize() first.');
+    }
+    const actualComposeCommand = composeCommand;
+
     // Get environment variables
-    const envVars = this.getEnvVars(config);
+    const envVars = await this.getEnvVars(config);
 
     // Use process.cwd() as project directory to ensure consistent context
     const escapedProjectDir = `"${process.cwd().replace(/"/g, '\\"')}"`;
     const escapedComposeFile = `"${composeFilePath.replace(/"/g, '\\"')}"`;
     const projectDirFlag = `--project-directory ${escapedProjectDir}`;
 
-    // 1. Start containers in detached mode (Sync)
+    // 1. Start containers in detached mode (Async)
     const upCommand =
-      `${this.composeCommand} ${projectDirFlag} -f ${escapedComposeFile} ${profiles} up -d ${services}`.trim();
+      `${actualComposeCommand} ${projectDirFlag} -f ${escapedComposeFile} ${profiles} up -d ${services}`.trim();
 
     try {
-      execSync(upCommand, {
+      await runCommand(upCommand, {
         cwd,
         env: envVars,
-        stdio: 'pipe',
+        stdio: ['pipe', 'pipe', 'pipe'], // Capture stdout/stderr
       });
     } catch (error) {
       throw new Error(
@@ -71,7 +81,7 @@ export class DockerExecutor {
 
     // 2. Spawn logs -f as the long-running process
     const logsCommand =
-      `${this.composeCommand} ${projectDirFlag} -f ${escapedComposeFile} logs -f ${services}`.trim();
+      `${actualComposeCommand} ${projectDirFlag} -f ${escapedComposeFile} logs -f ${services}`.trim();
 
     return this.processManager.spawn({
       id,
@@ -83,11 +93,11 @@ export class DockerExecutor {
       onStop: async () => {
         try {
           const stopCommand =
-            `${this.composeCommand} ${projectDirFlag} -f ${escapedComposeFile} stop ${services}`.trim();
-          execSync(stopCommand, {
+            `${actualComposeCommand} ${projectDirFlag} -f ${escapedComposeFile} stop ${services}`.trim();
+          await runCommand(stopCommand, {
             cwd,
             env: envVars,
-            stdio: 'ignore',
+            stdio: ['pipe', 'ignore', 'ignore'],
           });
         } catch (_error) {
           // Ignore errors
@@ -103,18 +113,24 @@ export class DockerExecutor {
     const composeFilePath = resolve(config.composeFile);
     const cwd = dirname(composeFilePath);
     const services = config.services?.join(' ') ?? '';
-    const envVars = this.getEnvVars(config);
+    const envVars = await this.getEnvVars(config); // Await getEnvVars
+
+    const { composeCommand } = this;
+    if (!composeCommand) {
+      throw new Error('DockerExecutor not initialized. Call initialize() first.');
+    }
+    const actualComposeCommand = composeCommand; // Await the composeCommand promise
 
     try {
       const escapedProjectDir = `"${process.cwd().replace(/"/g, '\\"')}"`;
       const escapedComposeFile = `"${composeFilePath.replace(/"/g, '\\"')}"`;
       const projectDirFlag = `--project-directory ${escapedProjectDir}`;
       const stopCommand =
-        `${this.composeCommand} ${projectDirFlag} -f ${escapedComposeFile} stop ${services}`.trim();
-      execSync(stopCommand, {
+        `${actualComposeCommand} ${projectDirFlag} -f ${escapedComposeFile} stop ${services}`.trim();
+      await runCommand(stopCommand, {
         cwd,
         env: envVars,
-        stdio: 'ignore',
+        stdio: ['pipe', 'ignore', 'ignore'],
       });
     } catch (error) {
       console.warn(`Failed to stop docker containers for ${id}:`, error);
@@ -123,12 +139,17 @@ export class DockerExecutor {
     return this.processManager.stop(id);
   }
 
-  private getEnvVars(config: DockerModule): NodeJS.ProcessEnv {
+  private async getEnvVars(config: DockerModule): Promise<NodeJS.ProcessEnv> {
     let envVars: Record<string, string | undefined> = { ...process.env };
     const rootEnvPath = join(process.cwd(), '.env');
 
-    if (existsSync(rootEnvPath)) {
-      const rootEnv = dotenv.parse(readFileSync(rootEnvPath));
+    if (
+      await stat(rootEnvPath)
+        .then(() => true)
+        .catch(() => false)
+    ) {
+      const rootEnvContent = await readFile(rootEnvPath, 'utf-8');
+      const rootEnv = dotenv.parse(rootEnvContent);
       envVars = { ...envVars, ...rootEnv };
     }
 
@@ -165,8 +186,12 @@ export class DockerExecutor {
    * @param config - Docker module configuration
    * @returns Array of Docker containers
    */
-  getContainers(config: DockerModule): DockerContainer[] {
-    return listContainers(config.composeFile, process.cwd());
+  async getContainers(config: DockerModule): Promise<DockerContainer[]> {
+    const { composeCommand } = this;
+    if (!composeCommand) {
+      throw new Error('DockerExecutor not initialized. Call initialize() first.');
+    }
+    return listContainers(config.composeFile, process.cwd(), composeCommand);
   }
 
   /**
@@ -175,7 +200,16 @@ export class DockerExecutor {
    * @param config - Docker module configuration
    * @returns Array of services with container info
    */
-  getServices(config: DockerModule): DockerComposeService[] {
-    return getServicesContainers(config.composeFile, config.services, process.cwd());
+  async getServices(config: DockerModule): Promise<DockerComposeService[]> {
+    const { composeCommand } = this;
+    if (!composeCommand) {
+      throw new Error('DockerExecutor not initialized. Call initialize() first.');
+    }
+    return getServicesContainers(
+      config.composeFile,
+      config.services,
+      process.cwd(),
+      composeCommand
+    );
   }
 }

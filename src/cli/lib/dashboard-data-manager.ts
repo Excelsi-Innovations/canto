@@ -77,7 +77,10 @@ export class DashboardDataManager {
     }
 
     // Check Docker daemon is running (not just CLI installed)
-    this.dockerAvailable = isDockerRunning();
+    this.dockerAvailable = await isDockerRunning();
+
+    // Initialize DockerExecutor for async operations
+    await this.dockerExecutor.initialize();
 
     // Load config once on startup
     await this.loadInitialConfig();
@@ -328,7 +331,7 @@ export class DashboardDataManager {
           moduleStatus.status = 'STOPPED';
         } else {
           try {
-            const services = this.dockerExecutor.getServices(module);
+            const services = await this.dockerExecutor.getServices(module);
             moduleStatus.containers = services
               .filter(
                 (s): s is typeof s & { container: NonNullable<typeof s.container> } => !!s.container

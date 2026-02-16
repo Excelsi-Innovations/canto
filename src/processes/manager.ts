@@ -67,9 +67,13 @@ export class ProcessManager {
 
     const result = await spawnProcess(
       options,
-      (info) => {
+      async (info) => {
         this.processes.set(id, info);
-        this.stateStore.save(this.processes);
+        // We don't await this to keep UI responsive during high-frequency updates
+        // But we catch errors to avoid unhandled rejections
+        this.stateStore
+          .save(this.processes)
+          .catch((err) => console.error('Failed to save state during update:', err));
       },
       (id, text, type) => {
         this.handleOutput(id, text, type);
@@ -121,7 +125,7 @@ export class ProcessManager {
       processInfo.stoppedAt = new Date();
       this.processes.set(id, processInfo);
       this.childProcesses.delete(id);
-      this.stateStore.save(this.processes);
+      await this.stateStore.save(this.processes);
     }
 
     return { success: result.success, processInfo, error: result.error };

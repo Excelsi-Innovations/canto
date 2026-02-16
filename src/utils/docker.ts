@@ -1,7 +1,39 @@
-import { execSync } from 'child_process';
+import { exec, type ExecOptions, type StdioOptions } from 'node:child_process';
 import { dirname } from 'path';
 import pc from 'picocolors';
 import { dockerCache } from './docker-cache.js';
+
+interface RunCommandOptions extends ExecOptions {
+  timeout?: number; // Timeout in milliseconds
+  stdio?: StdioOptions; // Explicitly add stdio property
+}
+
+/**
+ * Executes a shell command asynchronously and returns its stdout.
+ * Throws an error if the command fails or times out.
+ */
+export async function runCommand(
+  command: string,
+  options: RunCommandOptions = {}
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = exec(command, { encoding: 'utf8', ...options }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(`Command failed: ${command}\n${stderr}`));
+      } else {
+        resolve(stdout as string);
+      }
+    });
+
+    if (options.timeout) {
+      const timer = setTimeout(() => {
+        child.kill();
+        reject(new Error(`Command timed out after ${options.timeout}ms: ${command}`));
+      }, options.timeout);
+      child.on('exit', () => clearTimeout(timer));
+    }
+  });
+}
 
 /**
  * Docker container information
@@ -30,13 +62,13 @@ type DockerComposeCommand = 'docker compose' | 'docker-compose';
  * Detect which Docker Compose command is available
  * Prefers 'docker compose' (v2) over 'docker-compose' (v1)
  */
-export function detectDockerCompose(): DockerComposeCommand {
+export async function detectDockerCompose(): Promise<DockerComposeCommand> {
   try {
-    execSync('docker compose version', { stdio: 'ignore' });
+    await runCommand('docker compose version', { stdio: ['pipe', 'ignore', 'ignore'] });
     return 'docker compose';
   } catch {
     try {
-      execSync('docker-compose --version', { stdio: 'ignore' });
+      await runCommand('docker-compose --version', { stdio: ['pipe', 'ignore', 'ignore'] });
       return 'docker-compose';
     } catch {
       return 'docker compose'; // Default fallback
@@ -47,9 +79,9 @@ export function detectDockerCompose(): DockerComposeCommand {
 /**
  * Check if Docker CLI is installed on the system
  */
-export function isDockerAvailable(): boolean {
+export async function isDockerAvailable(): Promise<boolean> {
   try {
-    execSync('docker --version', { stdio: 'ignore' });
+    await runCommand('docker --version', { stdio: ['pipe', 'ignore', 'ignore'] });
     return true;
   } catch {
     return false;
@@ -60,9 +92,9 @@ export function isDockerAvailable(): boolean {
  * Check if Docker daemon is actually running (not just CLI installed)
  * This prevents error spam when Docker Desktop is not started.
  */
-export function isDockerRunning(): boolean {
+export async function isDockerRunning(): Promise<boolean> {
   try {
-    execSync('docker info', { stdio: 'ignore', timeout: 3000 });
+    await runCommand('docker info', { stdio: ['pipe', 'ignore', 'ignore'], timeout: 3000 });
     return true;
   } catch {
     return false;
@@ -100,7 +132,11 @@ function parseContainerStatus(
  * @param composeFilePath - Path to docker-compose.yml
  * @returns Array of Docker containers
  */
-export function listContainers(composeFilePath: string, projectRoot?: string): DockerContainer[] {
+export async function listContainers(
+  composeFilePath: string,
+  projectRoot?: string,
+  composeCommand: string = 'docker compose'
+): Promise<DockerContainer[]> {
   // Check cache first
   const cached = dockerCache.get(composeFilePath);
   if (cached) {
@@ -113,9 +149,9 @@ export function listContainers(composeFilePath: string, projectRoot?: string): D
     // Get project name from docker-compose.yml
     const escapedProjectRoot = projectRoot ? `"${projectRoot.replace(/"/g, '\\"')}"` : '';
     const projectDirFlag = projectRoot ? `--project-directory ${escapedProjectRoot}` : '';
-    const projectCommand = `docker compose -f "${composeFilePath.replace(/"/g, '\\"')}" ${projectDirFlag} config --format json`;
+    const projectCommand = `${composeCommand} -f "${composeFilePath.replace(/"/g, '\\"')}" ${projectDirFlag} config --format json`;
 
-    const projectName = execSync(projectCommand, {
+    const projectNameOutput = await runCommand(projectCommand, {
       cwd,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'ignore'],
@@ -123,7 +159,7 @@ export function listContainers(composeFilePath: string, projectRoot?: string): D
 
     let project = 'default';
     try {
-      const config = JSON.parse(projectName);
+      const config = JSON.parse(projectNameOutput);
       project = config.name ?? dirname(composeFilePath).split(/[\\/]/).pop() ?? 'default';
     } catch {
       // Fallback to directory name
@@ -131,7 +167,7 @@ export function listContainers(composeFilePath: string, projectRoot?: string): D
     }
 
     // List containers using docker ps with project label filter
-    const output = execSync(
+    const output = await runCommand(
       `docker ps -a --filter "label=com.docker.compose.project=${project}" --format "{{.ID}}|{{.Names}}|{{.Status}}|{{.Image}}|{{.Ports}}|{{.CreatedAt}}"`,
       {
         cwd,
@@ -178,12 +214,13 @@ export function listContainers(composeFilePath: string, projectRoot?: string): D
  * @param services - Array of service names (optional, returns all if not specified)
  * @returns Array of Docker Compose services with container info
  */
-export function getServicesContainers(
+export async function getServicesContainers(
   composeFile: string,
   services?: string[],
-  projectRoot?: string
-): DockerComposeService[] {
-  const containers = listContainers(composeFile, projectRoot);
+  projectRoot?: string,
+  composeCommand: string = 'docker compose'
+): Promise<DockerComposeService[]> {
+  const containers = await listContainers(composeFile, projectRoot, composeCommand);
 
   if (!services || services.length === 0) {
     // Return all containers as services

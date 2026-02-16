@@ -21,6 +21,7 @@ export async function statusCommand(_options: StatusOptions): Promise<void> {
     const processManager = ProcessManager.getInstance();
     const orchestrator = new ModuleOrchestrator(processManager);
     const dockerExecutor = new DockerExecutor(processManager);
+    await dockerExecutor.initialize(); // Initialize DockerExecutor
 
     orchestrator.load(config);
 
@@ -49,7 +50,7 @@ export async function statusCommand(_options: StatusOptions): Promise<void> {
 
       // For Docker modules, show containers
       if (module.type === 'docker') {
-        const services = dockerExecutor.getServices(module);
+        const services = await dockerExecutor.getServices(module);
 
         if (services.length > 0) {
           // Module header row

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import type { ModuleStatus, ScreenProps } from '../../types.js';
 import type { Module } from '../../../config/schema.js';
 import { LogTailer } from '../../lib/log-tailer.js';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { LogViewer } from '../common/LogViewer.js';
 
 interface ModuleDetailsScreenProps extends ScreenProps {
   module: ModuleStatus;
@@ -14,64 +15,6 @@ interface ModuleDetailsScreenProps extends ScreenProps {
 /**
  * Colorizes a log line based on keywords and patterns
  */
-function colorizeLogLine(line: string, index: number): React.ReactNode {
-  // Sanitize line to prevent TUI breakage
-  const safeLine = line.replace(/\r/g, '');
-
-  if (!safeLine.trim()) {
-    return (
-      <Text key={index} dimColor wrap="wrap">
-        {' '}
-      </Text>
-    );
-  }
-
-  // Check for error patterns
-  if (
-    /error|exception|fatal|fail|crash|panic/i.test(safeLine) ||
-    /\[ERROR\]|\[FATAL\]|ERROR:|FATAL:/i.test(safeLine)
-  ) {
-    return (
-      <Text key={index} color="red" wrap="wrap">
-        {safeLine}
-      </Text>
-    );
-  }
-
-  // Check for warning patterns
-  if (/warn|warning|caution|alert/i.test(safeLine) || /\[WARN\]|WARN:/i.test(safeLine)) {
-    return (
-      <Text key={index} color="yellow" wrap="wrap">
-        {safeLine}
-      </Text>
-    );
-  }
-
-  // Check for success patterns
-  if (/success|complete|done|ready|listening|started/i.test(safeLine)) {
-    return (
-      <Text key={index} color="green" wrap="wrap">
-        {safeLine}
-      </Text>
-    );
-  }
-
-  // Check for info patterns
-  if (/info|debug|trace/i.test(safeLine) || /\[INFO\]|\[DEBUG\]|INFO:|DEBUG:/i.test(safeLine)) {
-    return (
-      <Text key={index} color="cyan" dimColor wrap="wrap">
-        {safeLine}
-      </Text>
-    );
-  }
-
-  // Default - regular log line
-  return (
-    <Text key={index} dimColor wrap="wrap">
-      {safeLine}
-    </Text>
-  );
-}
 
 /**
  * Format uptime in human-readable format
@@ -96,17 +39,7 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
   ({ module, moduleConfig, onBack, onQuit }) => {
     const [logTailer] = useState(() => new LogTailer(50));
     const [logLines, setLogLines] = useState<string[]>([]);
-    const [scrollOffset, setScrollOffset] = useState(0);
-    const maxVisibleLines = 15;
-
-    const [autoScroll, setAutoScroll] = useState(true);
-
-    // Auto-scroll logic
-    useEffect(() => {
-      if (autoScroll) {
-        setScrollOffset(Math.max(0, logLines.length - maxVisibleLines));
-      }
-    }, [logLines, autoScroll]);
+    // LogViewer handles scroll state internally
 
     // Throttling refs
     const latestLines = React.useRef<string[]>([]);
@@ -121,7 +54,6 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
       const logPath = join(process.cwd(), 'tmp', 'logs', `${module.name}.log`);
 
       // Reset
-      setAutoScroll(true);
       setLogLines([]);
 
       if (!existsSync(logPath)) {
@@ -150,31 +82,7 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
       };
     }, [module.name, logTailer]);
 
-    useInput((input, key) => {
-      if (input === 'q' || input === 'Q') {
-        onQuit();
-      } else if (input === 'b' || input === 'B' || key.escape) {
-        onBack();
-      } else if (input === 'g') {
-        // Go to Top
-        setScrollOffset(0);
-        setAutoScroll(false);
-      } else if (input === 'G') {
-        // Go to Bottom
-        setAutoScroll(true);
-      } else if (key.upArrow && scrollOffset > 0) {
-        setScrollOffset(scrollOffset - 1);
-        setAutoScroll(false);
-      } else if (key.downArrow && scrollOffset < logLines.length - maxVisibleLines) {
-        const newOffset = scrollOffset + 1;
-        setScrollOffset(newOffset);
-        if (newOffset >= logLines.length - maxVisibleLines) {
-          setAutoScroll(true);
-        }
-      }
-    });
-
-    const visibleLogs = logLines.slice(scrollOffset, scrollOffset + maxVisibleLines);
+    // useInput removed - LogViewer handles Q, B, G, Arrows
 
     return (
       <Box flexDirection="column" padding={1} width="100%">
@@ -382,33 +290,15 @@ export const ModuleDetailsScreen: React.FC<ModuleDetailsScreenProps> = React.mem
         )}
 
         {/* Real-time Logs */}
-        <Box
-          borderStyle="round"
+        <LogViewer
+          lines={logLines}
+          height={15}
+          title="Real-time Logs (last 15 lines)"
           borderColor="gray"
-          padding={1}
-          marginBottom={1}
-          flexDirection="column"
-          width="100%"
-        >
-          <Text bold color="yellow">
-            Real-time Logs (last {maxVisibleLines} lines)
-          </Text>
-          {logLines.length > maxVisibleLines && (
-            <Text dimColor>
-              Showing {scrollOffset + 1}-{Math.min(scrollOffset + maxVisibleLines, logLines.length)}{' '}
-              of {logLines.length} lines (↑↓ to scroll)
-            </Text>
-          )}
-          <Box marginTop={1} flexDirection="column">
-            {visibleLogs.length === 0 ? (
-              <Text dimColor>No logs available</Text>
-            ) : (
-              visibleLogs.map((line, index) => (
-                <Box key={scrollOffset + index}>{colorizeLogLine(line, scrollOffset + index)}</Box>
-              ))
-            )}
-          </Box>
-        </Box>
+          onBack={onBack}
+          onQuit={onQuit}
+          onClear={() => logTailer.clear()}
+        />
 
         {/* Footer */}
         <Box borderStyle="single" borderColor="gray" padding={1}>

@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { ProcessStatus, type ProcessInfo } from '../types.js';
 
@@ -47,7 +48,7 @@ export class ProcessStateStore {
   /**
    * Save current process state to disk
    */
-  save(processes: Map<string, ProcessInfo>): void {
+  async save(processes: Map<string, ProcessInfo>): Promise<void> {
     try {
       const dir = dirname(this.stateFile);
       if (!existsSync(dir)) {
@@ -60,7 +61,7 @@ export class ProcessStateStore {
         onStop: undefined,
       }));
 
-      writeFileSync(this.stateFile, JSON.stringify(data, null, 2));
+      await writeFile(this.stateFile, JSON.stringify(data, null, 2));
     } catch (error) {
       console.error(`ERROR: Failed to save state to ${this.stateFile}:`, error);
     }

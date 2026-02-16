@@ -73,6 +73,14 @@ export class LogTailer {
   }
 
   /**
+   * Clear current log lines.
+   */
+  clear(): void {
+    this.lines = [];
+    this.notifySubscribers();
+  }
+
+  /**
    * Get current lines.
    */
   getLines(): string[] {

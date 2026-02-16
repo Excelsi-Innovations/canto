@@ -58,6 +58,8 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
       return tasks.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()));
     }, [tasks, filter]);
 
+    const [isSearching, setIsSearching] = useState(false);
+
     // Reset viewport when filter changes
     useEffect(() => {
       setSelectedIndex(0);
@@ -77,7 +79,7 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
       // logs is string[] of chunks.
       const fullLog = logs.join('');
       const lines = fullLog.split('\n');
-      if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+      if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop(); // Remove trailing empty line
       setOutputLines(lines.slice(-20));
 
       // Subscribe to new output
@@ -97,16 +99,55 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
       };
     }, [selectedIndex, filteredTasks, processManager]);
 
+    // Refs to track state in useInput closure
+    const isSearchingRef = React.useRef(isSearching);
+    const filterRef = React.useRef(filter);
+
+    useEffect(() => {
+      isSearchingRef.current = isSearching;
+    }, [isSearching]);
+
+    useEffect(() => {
+      filterRef.current = filter;
+    }, [filter]);
+
     useInput(async (input, key) => {
-      // Back / Escape logic
-      if (key.escape || (input.toLowerCase() === 'b' && !filter)) {
-        if (filter) {
-          setFilter('');
+      const _isSearching = isSearchingRef.current;
+      const _filter = filterRef.current;
+
+      // SEARCH MODE ACTIONS
+      if (_isSearching) {
+        if (key.escape || key.return) {
+          setIsSearching(false);
           return;
         }
 
-        // If task is running, maybe we want to kill it?
-        // For now, just go back.
+        if (key.backspace || key.delete) {
+          setFilter((prev) => prev.slice(0, -1));
+          return;
+        }
+
+        if (!key.ctrl && !key.meta && input.length === 1) {
+          setFilter((prev) => prev + input);
+        }
+        return;
+      }
+
+      // NORMAL MODE ACTIONS
+
+      // Search toggle
+      if (input === '/') {
+        setIsSearching(true);
+        return;
+      }
+
+      // Back / Quit
+      if (key.escape || input === 'b' || input === 'B') {
+        // If we have a filter but not searching, 'Esc' clears it first?
+        if (_filter) {
+          setFilter('');
+          return;
+        }
         onBack();
         return;
       }
@@ -116,19 +157,18 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
         return;
       }
 
-      if (key.upArrow) {
+      // Navigation
+      if (key.upArrow || input === 'k') {
         const newIndex = Math.max(0, selectedIndex - 1);
         setSelectedIndex(newIndex);
-        // Scroll viewport up if cursor goes above visible area
         if (newIndex < taskListOffset) {
           setTaskListOffset(newIndex);
         }
       }
 
-      if (key.downArrow) {
+      if (key.downArrow || input === 'j') {
         const newIndex = Math.min(filteredTasks.length - 1, selectedIndex + 1);
         setSelectedIndex(newIndex);
-        // Scroll viewport down if cursor goes below visible area
         if (newIndex >= taskListOffset + visibleTaskCount) {
           setTaskListOffset(newIndex - visibleTaskCount + 1);
         }
@@ -136,7 +176,7 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
 
       const selectedTask = filteredTasks[selectedIndex];
 
-      // Scrolling
+      // Scrolling Logs
       if (key.pageUp) {
         setScrollOffset((prev) => Math.min(Math.max(0, outputLines.length - 10), prev + 10));
       }
@@ -144,8 +184,8 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
         setScrollOffset((prev) => Math.max(0, prev - 10));
       }
 
-      // Kill Task
-      if ((key.ctrl && input === 'c') || input === 'k' || input === 'K') {
+      // Stop Task
+      if ((key.ctrl && input === 'c') || input === 'x' || input === 'X') {
         if (selectedTask && runningTasks.has(selectedTask.id)) {
           await runner.stop(selectedTask.id);
           setRunningTasks((prev) => {
@@ -158,6 +198,7 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
         }
       }
 
+      // Run Task
       if (key.return) {
         if (selectedTask) {
           try {
@@ -176,15 +217,6 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
             });
           }
         }
-      }
-
-      // Filter typing
-      if (input?.length === 1 && !key.ctrl && !key.meta && !key.return) {
-        setFilter((prev) => prev + input);
-      }
-
-      if (key.backspace) {
-        setFilter((prev) => prev.slice(0, -1));
       }
     });
 
@@ -208,18 +240,36 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
               borderStyle="single"
               borderColor={theme.colors.border}
             >
-              {filter && (
+              {filter && !isSearching && (
                 <Box
                   paddingX={1}
                   borderStyle="single"
                   borderBottom={false}
                   borderLeft={false}
                   borderRight={false}
+                  borderColor={theme.colors.border}
                 >
                   <Text>
                     Filter:{' '}
                     <Text bold color={theme.colors.info}>
                       {filter}
+                    </Text>
+                  </Text>
+                </Box>
+              )}
+              {isSearching && (
+                <Box
+                  paddingX={1}
+                  borderStyle="single"
+                  borderBottom={false}
+                  borderLeft={false}
+                  borderRight={false}
+                  borderColor={theme.colors.highlight}
+                >
+                  <Text>
+                    Search:{' '}
+                    <Text bold color={theme.colors.highlight}>
+                      {filter}█
                     </Text>
                   </Text>
                 </Box>
@@ -313,7 +363,7 @@ export const CommanderScreen: React.FC<CommanderScreenProps> = React.memo(
         )}
 
         <Box marginTop={1} borderStyle="single" borderColor={theme.colors.border}>
-          <Text dimColor>Enter: Run • K: Stop • Filter: Type • B/Esc: Back</Text>
+          <Text dimColor>Enter: Run • /: Search • K/X: Stop • B/Esc: Back</Text>
         </Box>
       </Box>
     );

@@ -17,6 +17,57 @@ import type { ToastData } from '../components/dashboard/Toast.js';
 import { THEMES, type Theme } from '../../utils/preferences.js';
 
 export function useDashboardData() {
+  // Helper for deep comparison of ModuleStatus arrays
+  const areModulesEqual = useCallback((prev: ModuleStatus[], next: ModuleStatus[]): boolean => {
+    if (prev.length !== next.length) {
+      return false;
+    }
+
+    for (let i = 0; i < prev.length; i++) {
+      const p = prev[i];
+      const n = next[i];
+
+      if (!p || !n) return false; // Should not happen if lengths are equal and elements exist
+
+      // Basic properties (handle potential undefined/null)
+      if (
+        p.name !== n.name ||
+        p.type !== n.type ||
+        p.status !== n.status ||
+        p.pid !== n.pid ||
+        (p.startedAt ?? null) !== (n.startedAt ?? null) || // Compare ensuring null/undefined consistency
+        (p.cpu ?? 0) !== (n.cpu ?? 0) ||
+        (p.memory ?? 0) !== (n.memory ?? 0)
+      ) {
+        return false;
+      }
+
+      // Deep compare containers if they exist (Docker modules)
+      if (p.containers && n.containers) {
+        if (p.containers.length !== n.containers.length) {
+          return false;
+        }
+        for (let j = 0; j < p.containers.length; j++) {
+          const pc = p.containers[j];
+          const nc = n.containers[j];
+          if (!pc || !nc) return false; // Should not happen if lengths are equal
+          if (
+            pc.name !== nc.name ||
+            pc.status !== nc.status ||
+            pc.health !== nc.health ||
+            pc.ports.join(',') !== nc.ports.join(',') // Compare joined ports string
+          ) {
+            return false;
+          }
+        }
+      } else if (p.containers !== n.containers) {
+        // One has containers, the other doesn't, and they are not both undefined/null
+        return false;
+      }
+    }
+    return true;
+  }, []);
+
   // State
   const [modules, setModules] = useState<ModuleStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,7 +184,12 @@ export function useDashboardData() {
         return res ? { ...m, cpu: res.cpu, memory: res.memory } : m;
       });
 
-      setModules(mergedModules);
+      setModules((prevModules) => {
+        if (areModulesEqual(prevModules, mergedModules)) {
+          return prevModules; // No change, return previous state to prevent re-render
+        }
+        return mergedModules;
+      });
 
       const newAlerts: ResourceAlert[] = [];
       mergedModules.forEach((module) => {
@@ -188,7 +244,13 @@ export function useDashboardData() {
         const res = resources.processes.get(m.pid);
         return res ? { ...m, cpu: res.cpu, memory: res.memory } : m;
       });
-      setModules(mergedModules);
+
+      setModules((prevModules) => {
+        if (areModulesEqual(prevModules, mergedModules)) {
+          return prevModules; // No change, return previous state to prevent re-render
+        }
+        return mergedModules;
+      });
     });
     return () => {
       unsubscribe();

@@ -44,10 +44,10 @@ describe('Dashboard Load Tests', () => {
 
     // Mock Docker utils to prevent blocking execSync calls
     mock.module('../../src/utils/docker', () => ({
-      isDockerRunning: () => true,
-      isDockerAvailable: () => true,
-      listContainers: () => [],
-      getServicesContainers: () => [],
+      isDockerRunning: async () => true,
+      isDockerAvailable: async () => true,
+      listContainers: async () => [],
+      getServicesContainers: async () => [],
     }));
 
     // Create valid config file for tests
@@ -124,84 +124,92 @@ modules:
       expect(readDuration).toBeLessThan(10); // Cached, should be fast
     });
 
-    test('should handle 100 modules efficiently', async () => {
-      const moduleNames = Array.from({ length: 100 }, (_, i) => `module-${i}`);
+    test(
+      'should handle 100 modules efficiently',
+      async () => {
+        const moduleNames = Array.from({ length: 100 }, (_, i) => `module-${i}`);
 
-      const mockOrchestrator = {
-        load: () => {},
-        getModuleNames: () => moduleNames,
-        getModule: (name: string) => ({ name, type: 'workspace' }),
-      };
+        const mockOrchestrator = {
+          load: () => {},
+          getModuleNames: () => moduleNames,
+          getModule: (name: string) => ({ name, type: 'workspace' }),
+        };
 
-      const mockProcessManager = {
-        getStatus: () => 'RUNNING',
-        getPid: () => 5000,
-      };
+        const mockProcessManager = {
+          getStatus: () => 'RUNNING',
+          getPid: () => 5000,
+        };
 
-      const mockDockerExecutor = {
-        getServices: () => [],
-      };
+        const mockDockerExecutor = {
+          getServices: () => [],
+        };
 
-      dataManager = new DashboardDataManager(
-        mockOrchestrator as any,
-        mockProcessManager as any,
-        mockDockerExecutor as any,
-        testDir
-      );
+        dataManager = new DashboardDataManager(
+          mockOrchestrator as any,
+          mockProcessManager as any,
+          mockDockerExecutor as any,
+          testDir
+        );
 
-      const start = Date.now();
-      await dataManager.initialize();
-      const duration = Date.now() - start;
+        const start = Date.now();
+        await dataManager.initialize();
+        const duration = Date.now() - start;
 
-      // Should still initialize in reasonable time
-      // With real system calls, 100 modules can take significant time
-      expect(duration).toBeLessThan(80000); // 80 seconds for 100 modules with real queries
+        // Should still initialize in reasonable time
+        // With real system calls, 100 modules can take significant time
+        expect(duration).toBeLessThan(80000); // 80 seconds for 100 modules with real queries
 
-      // Read should still be fast (cached)
-      const readStart = Date.now();
-      dataManager.getModuleStatuses();
-      const readDuration = Date.now() - readStart;
+        // Read should still be fast (cached)
+        const readStart = Date.now();
+        dataManager.getModuleStatuses();
+        const readDuration = Date.now() - readStart;
 
-      expect(readDuration).toBeLessThan(20);
-    }, { timeout: 90000 });
+        expect(readDuration).toBeLessThan(20);
+      },
+      { timeout: 90000 }
+    );
 
-    test('should update many modules without blocking', async () => {
-      const moduleNames = Array.from({ length: 50 }, (_, i) => `module-${i}`);
+    test(
+      'should update many modules without blocking',
+      async () => {
+        const moduleNames = Array.from({ length: 50 }, (_, i) => `module-${i}`);
 
-      const mockOrchestrator = {
-        load: () => {},
-        getModuleNames: () => moduleNames,
-        getModule: (name: string) => ({ name, type: 'workspace' }),
-      };
+        const mockOrchestrator = {
+          load: () => {},
+          getModuleNames: () => moduleNames,
+          getModule: (name: string) => ({ name, type: 'workspace' }),
+        };
 
-      const mockProcessManager = {
-        getStatus: () => 'RUNNING',
-        getPid: () => 1234,
-      };
+        const mockProcessManager = {
+          getStatus: () => 'RUNNING',
+          getPid: () => 1234,
+        };
 
-      const mockDockerExecutor = {
-        getServices: () => [],
-      };
+        const mockDockerExecutor = {
+          getServices: () => [],
+        };
 
-      dataManager = new DashboardDataManager(
-        mockOrchestrator as any,
-        mockProcessManager as any,
-        mockDockerExecutor as any,
-        testDir
-      );
+        dataManager = new DashboardDataManager(
+          mockOrchestrator as any,
+          mockProcessManager as any,
+          mockDockerExecutor as any,
+          testDir
+        );
 
-      await dataManager.initialize();
+        await dataManager.initialize();
 
-      // Mark all modules dirty and update
-      const start = Date.now();
-      dataManager.markAllDirty();
-      await dataManager.forceUpdate();
-      const duration = Date.now() - start;
+        // Mark all modules dirty and update
+        const start = Date.now();
+        dataManager.markAllDirty();
+        await dataManager.forceUpdate();
+        const duration = Date.now() - start;
 
-      // Should update all 50 modules efficiently (parallel)
-      // Relaxed assertion for slower environments
-      expect(duration).toBeLessThan(120000); // 120 seconds ceiling
-    }, { timeout: 120000 });
+        // Should update all 50 modules efficiently (parallel)
+        // Relaxed assertion for slower environments
+        expect(duration).toBeLessThan(120000); // 120 seconds ceiling
+      },
+      { timeout: 120000 }
+    );
   });
 
   describe('Subscription Scaling Tests', () => {
@@ -344,95 +352,111 @@ modules:
   });
 
   describe('Log File Scaling Tests', () => {
-    test('should handle large log files (10,000 lines)', async () => {
-      const logPath = join(testDir, 'large.log');
+    test(
+      'should handle large log files (10,000 lines)',
+      async () => {
+        const logPath = join(testDir, 'large.log');
 
-      // Create large log file
-      const lines = Array.from({ length: 10000 }, (_, i) => `Log line ${i + 1}`).join('\n');
-      await fs.writeFile(logPath, lines);
+        // Create large log file
+        const lines = Array.from({ length: 10000 }, (_, i) => `Log line ${i + 1}`).join('\n');
+        await fs.writeFile(logPath, lines);
 
-      // Should read efficiently (only last N lines)
-      const start = Date.now();
-      await logTailer.start(logPath);
-      const duration = Date.now() - start;
+        // Should read efficiently (only last N lines)
+        const start = Date.now();
+        await logTailer.start(logPath);
+        const duration = Date.now() - start;
 
-      expect(duration).toBeLessThan(12000);
+        expect(duration).toBeLessThan(12000);
 
-      // Should only have last 1000 lines (buffer size)
-      const logLines = logTailer.getLines();
-      expect(logLines.length).toBeLessThanOrEqual(1000);
-    }, { timeout: 30000 });
+        // Should only have last 1000 lines (buffer size)
+        const logLines = logTailer.getLines();
+        expect(logLines.length).toBeLessThanOrEqual(1000);
+      },
+      { timeout: 30000 }
+    );
 
-    test('should handle very large log files (1MB)', async () => {
-      const logPath = join(testDir, 'huge.log');
+    test(
+      'should handle very large log files (1MB)',
+      async () => {
+        const logPath = join(testDir, 'huge.log');
 
-      // Create 1MB log file
-      const line = 'x'.repeat(100) + '\n';
-      const lines = line.repeat(10000); // ~1MB
-      await fs.writeFile(logPath, lines);
+        // Create 1MB log file
+        const line = 'x'.repeat(100) + '\n';
+        const lines = line.repeat(10000); // ~1MB
+        await fs.writeFile(logPath, lines);
 
-      // Should read efficiently using 64KB buffer strategy
-      const start = Date.now();
-      await logTailer.start(logPath);
-      const duration = Date.now() - start;
+        // Should read efficiently using 64KB buffer strategy
+        const start = Date.now();
+        await logTailer.start(logPath);
+        const duration = Date.now() - start;
 
-      expect(duration).toBeLessThan(9000);
+        expect(duration).toBeLessThan(9000);
 
-      const logLines = logTailer.getLines();
-      expect(logLines.length).toBeGreaterThan(0);
-    }, { timeout: 30000 });
+        const logLines = logTailer.getLines();
+        expect(logLines.length).toBeGreaterThan(0);
+      },
+      { timeout: 30000 }
+    );
 
-    test('should handle rapid log appends', async () => {
-      const logPath = join(testDir, 'rapid.log');
-      await fs.writeFile(logPath, 'Initial\n');
-      await logTailer.start(logPath);
+    test(
+      'should handle rapid log appends',
+      async () => {
+        const logPath = join(testDir, 'rapid.log');
+        await fs.writeFile(logPath, 'Initial\n');
+        await logTailer.start(logPath);
 
-      let updateCount = 0;
-      logTailer.subscribe(() => {
-        updateCount++;
-      });
+        let updateCount = 0;
+        logTailer.subscribe(() => {
+          updateCount++;
+        });
 
-      // Rapidly append 100 lines
-      const start = Date.now();
-      for (let i = 0; i < 100; i++) {
-        await fs.appendFile(logPath, `Line ${i}\n`);
-      }
-      const appendDuration = Date.now() - start;
+        // Rapidly append 100 lines
+        const start = Date.now();
+        for (let i = 0; i < 100; i++) {
+          await fs.appendFile(logPath, `Line ${i}\n`);
+        }
+        const appendDuration = Date.now() - start;
 
-      // Wait for file watch events
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Wait for file watch events
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Should have processed appends
-      expect(updateCount).toBeGreaterThan(1);
+        // Should have processed appends
+        expect(updateCount).toBeGreaterThan(1);
 
-      // Final log should contain recent lines
-      const lines = logTailer.getLines();
-      expect(lines.some((line) => line.includes('Line'))).toBe(true);
-    }, { timeout: 30000 });
+        // Final log should contain recent lines
+        const lines = logTailer.getLines();
+        expect(lines.some((line) => line.includes('Line'))).toBe(true);
+      },
+      { timeout: 30000 }
+    );
   });
 
   describe('Memory Stability Tests', () => {
-    test('should maintain stable memory with prolonged use', async () => {
-      resourceMonitor.start();
+    test(
+      'should maintain stable memory with prolonged use',
+      async () => {
+        resourceMonitor.start();
 
-      // Simulate prolonged use
-      for (let i = 0; i < 100; i++) {
-        // Get resources multiple times
-        for (let j = 0; j < 10; j++) {
-          resourceMonitor.getLatestResources();
+        // Simulate prolonged use
+        for (let i = 0; i < 100; i++) {
+          // Get resources multiple times
+          for (let j = 0; j < 10; j++) {
+            resourceMonitor.getLatestResources();
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 50));
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
+        // System should still be responsive
+        const start = Date.now();
+        const resources = resourceMonitor.getLatestResources();
+        const duration = Date.now() - start;
 
-      // System should still be responsive
-      const start = Date.now();
-      const resources = resourceMonitor.getLatestResources();
-      const duration = Date.now() - start;
-
-      expect(resources).toBeDefined();
-      expect(duration).toBeLessThan(500);
-    }, { timeout: 30000 });
+        expect(resources).toBeDefined();
+        expect(duration).toBeLessThan(500);
+      },
+      { timeout: 30000 }
+    );
 
     test('should not leak memory with subscriber churn', async () => {
       // Create and destroy many subscribers
@@ -504,94 +528,102 @@ modules:
       expect(duration).toBeLessThan(2000);
     });
 
-    test('should handle mixed heavy load', async () => {
-      const moduleNames = Array.from({ length: 50 }, (_, i) => `module-${i}`);
+    test(
+      'should handle mixed heavy load',
+      async () => {
+        const moduleNames = Array.from({ length: 50 }, (_, i) => `module-${i}`);
 
-      const mockOrchestrator = {
-        load: () => {},
-        getModuleNames: () => moduleNames,
-        getModule: (name: string) => ({ name, type: 'workspace' }),
-      };
+        const mockOrchestrator = {
+          load: () => {},
+          getModuleNames: () => moduleNames,
+          getModule: (name: string) => ({ name, type: 'workspace' }),
+        };
 
-      const mockProcessManager = {
-        getStatus: () => 'RUNNING',
-        getPid: () => 1234,
-      };
+        const mockProcessManager = {
+          getStatus: () => 'RUNNING',
+          getPid: () => 1234,
+        };
 
-      const mockDockerExecutor = {
-        getServices: () => [],
-      };
+        const mockDockerExecutor = {
+          getServices: () => [],
+        };
 
-      dataManager = new DashboardDataManager(
-        mockOrchestrator as any,
-        mockProcessManager as any,
-        mockDockerExecutor as any,
-        testDir
-      );
+        dataManager = new DashboardDataManager(
+          mockOrchestrator as any,
+          mockProcessManager as any,
+          mockDockerExecutor as any,
+          testDir
+        );
 
-      resourceMonitor.start();
-      await dataManager.initialize();
+        resourceMonitor.start();
+        await dataManager.initialize();
 
-      const start = Date.now();
+        const start = Date.now();
 
-      // Mixed heavy operations
-      const operations: Promise<any>[] = [];
+        // Mixed heavy operations
+        const operations: Promise<any>[] = [];
 
-      for (let i = 0; i < 100; i++) {
-        // Resource reads
-        operations.push(Promise.resolve(resourceMonitor.getLatestResources()));
+        for (let i = 0; i < 100; i++) {
+          // Resource reads
+          operations.push(Promise.resolve(resourceMonitor.getLatestResources()));
 
-        // Module reads
-        operations.push(Promise.resolve(dataManager.getModuleStatuses()));
+          // Module reads
+          operations.push(Promise.resolve(dataManager.getModuleStatuses()));
 
-        // Preference writes
-        operations.push(Promise.resolve(preferencesManager.addToHistory(`cmd-${i}`)));
+          // Preference writes
+          operations.push(Promise.resolve(preferencesManager.addToHistory(`cmd-${i}`)));
 
-        // Module updates
-        if (i % 10 === 0) {
-          operations.push(Promise.resolve(dataManager.markDirty(`module-${i % 50}`)));
+          // Module updates
+          if (i % 10 === 0) {
+            operations.push(Promise.resolve(dataManager.markDirty(`module-${i % 50}`)));
+          }
         }
-      }
 
-      await Promise.all(operations);
+        await Promise.all(operations);
 
-      const duration = Date.now() - start;
+        const duration = Date.now() - start;
 
-      // Should handle mixed load efficiently
-      // Process manager mocks are fast, but promises overhead adds up
-      expect(duration).toBeLessThan(5000);
-    }, { timeout: 60000 });
+        // Should handle mixed load efficiently
+        // Process manager mocks are fast, but promises overhead adds up
+        expect(duration).toBeLessThan(5000);
+      },
+      { timeout: 60000 }
+    );
 
-    test('should recover from spike load', async () => {
-      resourceMonitor.start();
+    test(
+      'should recover from spike load',
+      async () => {
+        resourceMonitor.start();
 
-      // Normal load baseline
-      const baselineStart = Date.now();
-      for (let i = 0; i < 10; i++) {
-        resourceMonitor.getLatestResources();
-      }
-      const baselineDuration = Date.now() - baselineStart;
+        // Normal load baseline
+        const baselineStart = Date.now();
+        for (let i = 0; i < 10; i++) {
+          resourceMonitor.getLatestResources();
+        }
+        const baselineDuration = Date.now() - baselineStart;
 
-      // Spike load
-      const operations: Promise<any>[] = [];
-      for (let i = 0; i < 1000; i++) {
-        operations.push(Promise.resolve(resourceMonitor.getLatestResources()));
-      }
-      await Promise.all(operations);
+        // Spike load
+        const operations: Promise<any>[] = [];
+        for (let i = 0; i < 1000; i++) {
+          operations.push(Promise.resolve(resourceMonitor.getLatestResources()));
+        }
+        await Promise.all(operations);
 
-      // Recovery measurement
-      await new Promise((resolve) => setTimeout(resolve, 100));
+        // Recovery measurement
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const recoveryStart = Date.now();
-      for (let i = 0; i < 10; i++) {
-        resourceMonitor.getLatestResources();
-      }
-      const recoveryDuration = Date.now() - recoveryStart;
+        const recoveryStart = Date.now();
+        for (let i = 0; i < 10; i++) {
+          resourceMonitor.getLatestResources();
+        }
+        const recoveryDuration = Date.now() - recoveryStart;
 
-      // Should return to normal performance after spike
-      // Both should be fast, so just check they're reasonable
-      expect(recoveryDuration).toBeLessThanOrEqual(baselineDuration * 10 + 100);
-    }, { timeout: 60000 });
+        // Should return to normal performance after spike
+        // Both should be fast, so just check they're reasonable
+        expect(recoveryDuration).toBeLessThanOrEqual(baselineDuration * 10 + 100);
+      },
+      { timeout: 60000 }
+    );
   });
 
   describe('Benchmark Comparisons', () => {

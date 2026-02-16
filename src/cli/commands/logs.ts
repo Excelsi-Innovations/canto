@@ -31,6 +31,7 @@ export async function logsCommand(target: string, options: LogsOptions): Promise
       const processManager = ProcessManager.getInstance();
       const orchestrator = new ModuleOrchestrator(processManager);
       const dockerExecutor = new DockerExecutor(processManager);
+      await dockerExecutor.initialize(); // Initialize DockerExecutor
 
       orchestrator.load(config);
 
@@ -60,7 +61,7 @@ export async function logsCommand(target: string, options: LogsOptions): Promise
       }
 
       // Get containers for this module
-      const services = dockerExecutor.getServices(module);
+      const services = await dockerExecutor.getServices(module);
       const service = services.find(
         (s) => s.container && (s.container.name === containerName || s.name === containerName)
       );
