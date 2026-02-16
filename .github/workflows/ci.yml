@@ -8,98 +8,39 @@ on:
 
 jobs:
   test:
-    name: Test on ${{ matrix.os }} with ${{ matrix.runtime }}
+    name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        runtime: [node, bun]
-        node-version: [18.x, 20.x, 22.x]
-        exclude:
-          # Bun doesn't need Node.js version matrix
-          - runtime: bun
-            node-version: 20.x
-          - runtime: bun
-            node-version: 22.x
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
-        if: matrix.runtime == 'node'
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-
       - name: Setup Bun
-        if: matrix.runtime == 'bun'
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
 
-      - name: Install dependencies (Node.js)
-        if: matrix.runtime == 'node'
-        run: npm ci
-
-      - name: Install dependencies (Bun)
-        if: matrix.runtime == 'bun'
+      - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Type check
-        run: |
-          if [ "${{ matrix.runtime }}" = "bun" ]; then
-            bun run type-check
-          else
-            npm run type-check
-          fi
-        shell: bash
+        run: bun run type-check
 
       - name: Lint
-        run: |
-          if [ "${{ matrix.runtime }}" = "bun" ]; then
-            bun run lint
-          else
-            npm run lint
-          fi
-        shell: bash
+        run: bun run lint
 
       - name: Format check
-        run: |
-          if [ "${{ matrix.runtime }}" = "bun" ]; then
-            bun run format:check
-          else
-            npm run format:check
-          fi
-        shell: bash
+        run: bun run format:check
 
       - name: Build
-        run: |
-          if [ "${{ matrix.runtime }}" = "bun" ]; then
-            bun run build
-          else
-            npm run build
-          fi
-        shell: bash
+        run: bun run build
 
       - name: Run tests
-        run: |
-          if [ "${{ matrix.runtime }}" = "bun" ]; then
-            bun test
-          else
-            npm test
-          fi
-        shell: bash
-
-      - name: Upload build artifacts
-        if: matrix.os == 'ubuntu-latest' && matrix.runtime == 'node' && matrix.node-version == '20.x'
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-          retention-days: 7
+        run: bun test
 
   code-quality:
     name: Code Quality Analysis

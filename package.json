@@ -96,26 +96,6 @@
   },
   "peerDependencies": {
     "typescript": ">=5.0.0"
-  },
-  "peerDependenciesMeta": {
-    "typescript": {
-      "optional": true
-    }
-  },
-  "pkg": {
-    "scripts": [
-      "dist/**/*.js"
-    ],
-    "assets": [
-      "dist/**/*.d.ts",
-      "dist/**/*.d.ts.map"
-    ],
-    "targets": [
-      "node20-linux-x64",
-      "node20-macos-x64",
-      "node20-macos-arm64",
-      "node20-windows-x64"
-    ],
-    "outputPath": "binaries"
   }
+
 }
