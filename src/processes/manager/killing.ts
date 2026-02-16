@@ -1,6 +1,7 @@
 import { exec, type ChildProcess } from 'child_process';
 import { type ProcessInfo } from '../types.js';
 import type { ProcessLogger } from '../logger.js';
+import { isWindows } from '../../utils/platform.js';
 
 /**
  * Handles cross-platform process termination logic
@@ -51,7 +52,7 @@ export async function terminateProcess(
     });
 
     // Platform-specific tree killing
-    if (process.platform === 'win32' && processInfo.pid) {
+    if (isWindows() && processInfo.pid) {
       exec(`taskkill /pid ${processInfo.pid} /T /F`, (error) => {
         if (error) {
           logger?.log(`Taskkill failed: ${error.message}`, id);

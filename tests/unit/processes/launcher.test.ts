@@ -1,15 +1,16 @@
 import { mock } from 'bun:test';
 import { EventEmitter } from 'node:events';
 
-// Mock child_process BEFORE importing the module under test
-const mockChildProcess = new EventEmitter() as any;
-mockChildProcess.pid = 12345;
-mockChildProcess.stdout = new EventEmitter();
-mockChildProcess.stderr = new EventEmitter();
-mockChildProcess.unref = mock(() => {});
-
+// Mock child_process BEFORE import
 mock.module('child_process', () => ({
-  spawn: mock(() => mockChildProcess),
+  spawn: mock(() => {
+    const cp = new EventEmitter() as any;
+    cp.pid = 12345;
+    cp.stdout = new EventEmitter();
+    cp.stderr = new EventEmitter();
+    cp.unref = mock(() => {});
+    return cp;
+  }),
 }));
 
 import { describe, it, expect, beforeEach } from 'bun:test';
@@ -25,10 +26,6 @@ describe('spawnProcess', () => {
     onUpdate = mock(() => {});
     onOutput = mock(() => {});
     getLogger = mock(() => undefined);
-    // Reset EventEmitter listeners
-    mockChildProcess.removeAllListeners();
-    mockChildProcess.stdout.removeAllListeners();
-    mockChildProcess.stderr.removeAllListeners();
   });
 
   it('should spawn a process and update status to running', async () => {
@@ -40,7 +37,9 @@ describe('spawnProcess', () => {
 
     const promise = spawnProcess(options, onUpdate, onOutput, getLogger);
     
-    // It should immediately update to starting then running
+    // It should immediately update to starting
+    // Note: The second update (RUNNING) might happen synchronously in mock,
+    // so we check if it was called with STARTING at least once.
     expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ 
       status: ProcessStatus.STARTING 
     }));
@@ -60,12 +59,13 @@ describe('spawnProcess', () => {
       command: 'echo',
     };
 
-    await spawnProcess(options, onUpdate, onOutput, getLogger);
+    const result = await spawnProcess(options, onUpdate, onOutput, getLogger);
+    const mockCp = result.child as any;
     
-    mockChildProcess.stdout.emit('data', Buffer.from('hello from stdout'));
+    mockCp.stdout.emit('data', Buffer.from('hello from stdout'));
     expect(onOutput).toHaveBeenCalledWith('test-output', 'hello from stdout', 'stdout');
 
-    mockChildProcess.stderr.emit('data', Buffer.from('hello from stderr'));
+    mockCp.stderr.emit('data', Buffer.from('hello from stderr'));
     expect(onOutput).toHaveBeenCalledWith('test-output', 'hello from stderr', 'stderr');
   });
 
@@ -75,9 +75,10 @@ describe('spawnProcess', () => {
       command: 'echo',
     };
 
-    await spawnProcess(options, onUpdate, onOutput, getLogger);
+    const result = await spawnProcess(options, onUpdate, onOutput, getLogger);
+    const mockCp = result.child as any;
     
-    mockChildProcess.emit('exit', 0, null);
+    mockCp.emit('exit', 0, null);
     
     expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ 
       status: ProcessStatus.STOPPED,
@@ -91,9 +92,10 @@ describe('spawnProcess', () => {
       command: 'nonexistent',
     };
 
-    await spawnProcess(options, onUpdate, onOutput, getLogger);
+    const result = await spawnProcess(options, onUpdate, onOutput, getLogger);
+    const mockCp = result.child as any;
     
-    mockChildProcess.emit('exit', 1, null);
+    mockCp.emit('exit', 1, null);
     
     expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ 
       status: ProcessStatus.FAILED,
