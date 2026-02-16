@@ -1,26 +1,17 @@
 /**
  * macOS-specific async resource monitoring
- * Uses vm_stat, sysctl, and top commands via async exec
  */
 
 import { execCommand, parseNumeric } from '../async.js';
-
-export interface ResourceStats {
-  totalMemory: number;
-  usedMemory: number;
-  freeMemory: number;
-  cpuCount: number;
-  cpuUsage: number;
-}
+import type { ProcessResources, SystemResources } from '../types.js';
 
 /**
  * Get system resource stats for macOS
  */
-export async function getResourceStats(): Promise<ResourceStats> {
+export async function getDarwinSystemResources(): Promise<SystemResources> {
   try {
-    const pageSize = 4096; // bytes
+    const pageSize = 4096;
 
-    // Run all commands in parallel
     const [vmOutput, totalMemOutput, cpuCountOutput, topOutput] = await Promise.all([
       execCommand('vm_stat'),
       execCommand('sysctl hw.memsize'),
@@ -28,31 +19,25 @@ export async function getResourceStats(): Promise<ResourceStats> {
       execCommand('top -l 1 -n 0 | grep "CPU usage"'),
     ]);
 
-    // Parse vm_stat output
-    const getPages = (line: string | undefined): number => {
-      if (!line) return 0;
-      const match = line.match(/:\s+(\d+)/);
+    const getPages = (key: string): number => {
+      const match = vmOutput
+        .split('\n')
+        .find((l) => l.includes(key))
+        ?.match(/:\s+(\d+)/);
       return match?.[1] ? parseInt(match[1]) : 0;
     };
 
-    const lines = vmOutput.split('\n');
-    const freePages = getPages(lines.find((l) => l.includes('Pages free')));
-    const activePages = getPages(lines.find((l) => l.includes('Pages active')));
-    const inactivePages = getPages(lines.find((l) => l.includes('Pages inactive')));
-    const wiredPages = getPages(lines.find((l) => l.includes('Pages wired down')));
-
-    // Parse total memory
     const totalMemMatch = totalMemOutput.match(/\d+/);
     const totalMemBytes = totalMemMatch ? parseInt(totalMemMatch[0]) : 0;
-    const totalMemory = totalMemBytes / (1024 * 1024); // Convert to MB
+    const totalMemory = totalMemBytes / (1024 * 1024);
 
-    const freeMemory = (freePages * pageSize) / (1024 * 1024);
-    const usedMemory = ((activePages + inactivePages + wiredPages) * pageSize) / (1024 * 1024);
+    const freeMemory = (getPages('Pages free') * pageSize) / (1024 * 1024);
+    const usedMemory =
+      ((getPages('Pages active') + getPages('Pages inactive') + getPages('Pages wired down')) *
+        pageSize) /
+      (1024 * 1024);
 
-    // Parse CPU count
     const cpuCount = parseNumeric(cpuCountOutput) || 1;
-
-    // Parse CPU usage from top
     const cpuMatch = topOutput.match(/(\d+\.\d+)% user/);
     const cpuUsage = cpuMatch?.[1] ? parseFloat(cpuMatch[1]) : 0;
 
@@ -63,14 +48,31 @@ export async function getResourceStats(): Promise<ResourceStats> {
       cpuCount,
       cpuUsage,
     };
-  } catch (_error) {
-    // Return safe defaults on error
+  } catch {
+    return { totalMemory: 0, usedMemory: 0, freeMemory: 0, cpuCount: 1, cpuUsage: 0 };
+  }
+}
+
+/**
+ * Get process resources for macOS
+ */
+export async function getDarwinProcessResources(pid: number): Promise<ProcessResources | null> {
+  try {
+    const output = await execCommand(`ps -p ${pid} -o %cpu,%mem,rss`);
+    const lines = output.trim().split('\n');
+    if (lines.length < 2) return null;
+
+    const parts = lines[1]?.trim().split(/\s+/) ?? [];
+    const [cpu, mem, rss] = parts;
+    if (!cpu || !mem || !rss) return null;
+
     return {
-      totalMemory: 0,
-      usedMemory: 0,
-      freeMemory: 0,
-      cpuCount: 1,
-      cpuUsage: 0,
+      pid,
+      cpu: parseFloat(cpu),
+      memory: parseInt(rss) / 1024,
+      memoryPercent: parseFloat(mem),
     };
+  } catch {
+    return null;
   }
 }

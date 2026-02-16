@@ -1,50 +1,58 @@
-import { getSystemResources } from '../../utils/resources/index.js';
-import type { SystemResources } from '../../utils/resources.js';
+import { getGlobalResources } from '../../utils/resources/index.js';
+import type { GlobalResources } from '../../utils/resources/index.js';
 
 export interface ResourceMonitorConfig {
   updateInterval: number; // milliseconds
-  enableCPU: boolean;
-  enableMemory: boolean;
 }
 
-export type ResourceSubscriber = (resources: SystemResources) => void;
+export type ResourceSubscriber = (resources: GlobalResources) => void;
+export type PIDProvider = () => number[];
 
 /**
- * Monitors system resources asynchronously without blocking the main thread.
+ * Monitors system and process resources asynchronously without blocking the main thread.
  * Implements a pub/sub pattern for efficient updates.
+ * Optimized for Windows by batching all resource requests into a single PowerShell call.
  */
 export class AsyncResourceMonitor {
   private config: ResourceMonitorConfig;
-  private latestResources: SystemResources;
+  private latestGlobal: GlobalResources;
   private subscribers: Set<ResourceSubscriber> = new Set();
   private updateTimer: NodeJS.Timeout | null = null;
   private isPolling: boolean = false;
+  private pidProvider: PIDProvider = () => [];
 
   constructor(config: Partial<ResourceMonitorConfig> = {}) {
     this.config = {
       updateInterval: 5000,
-      enableCPU: true,
-      enableMemory: true,
       ...config,
     };
 
     // Initialize with default values
-    this.latestResources = {
-      totalMemory: 0,
-      usedMemory: 0,
-      freeMemory: 0,
-      cpuCount: 1,
-      cpuUsage: 0,
+    this.latestGlobal = {
+      system: {
+        totalMemory: 0,
+        usedMemory: 0,
+        freeMemory: 0,
+        cpuCount: 1,
+        cpuUsage: 0,
+      },
+      processes: new Map(),
     };
   }
 
   /**
-   * Start monitoring system resources.
-   * Polls asynchronously in the background.
+   * Set the provider for PIDs to monitor.
+   */
+  setPIDProvider(provider: PIDProvider): void {
+    this.pidProvider = provider;
+  }
+
+  /**
+   * Start monitoring resources.
    */
   start(): void {
     if (this.updateTimer) {
-      return; // Already started
+      return;
     }
 
     // Initial poll
@@ -57,7 +65,7 @@ export class AsyncResourceMonitor {
   }
 
   /**
-   * Stop monitoring system resources.
+   * Stop monitoring resources.
    */
   stop(): void {
     if (this.updateTimer) {
@@ -68,24 +76,24 @@ export class AsyncResourceMonitor {
 
   /**
    * Get the latest cached resource values.
-   * This is synchronous and non-blocking.
    */
-  getLatestResources(): SystemResources {
-    return { ...this.latestResources };
+  getLatestResources(): GlobalResources {
+    return {
+      system: { ...this.latestGlobal.system },
+      processes: new Map(this.latestGlobal.processes),
+    };
   }
 
   /**
    * Subscribe to resource updates.
-   * Returns an unsubscribe function.
    */
   subscribe(callback: ResourceSubscriber): () => void {
     this.subscribers.add(callback);
 
-    // Immediately call with current data
     try {
-      callback(this.latestResources);
+      callback(this.latestGlobal);
     } catch {
-      // Ignore subscriber errors
+      // Ignore
     }
 
     return () => {
@@ -94,43 +102,46 @@ export class AsyncResourceMonitor {
   }
 
   /**
-   * Poll system resources asynchronously.
-   * This runs in the background and never blocks.
-   * Now uses the cached resource monitoring system.
+   * Poll resources asynchronously.
    */
   private async pollResourcesAsync(): Promise<void> {
     if (this.isPolling) {
-      return; // Skip if already polling
+      return;
     }
 
     this.isPolling = true;
 
     try {
-      // Use the new cached resource monitoring system
-      const resources = await getSystemResources();
+      const pids = this.pidProvider();
+      const resources = await getGlobalResources(pids);
 
-      // Only update and notify if values actually changed
+      // Only update and notify if significant changes occurred
       if (this.hasChanged(resources)) {
-        this.latestResources = resources;
+        this.latestGlobal = resources;
         this.notifySubscribers(resources);
       }
     } catch (_error) {
-      // Silently fail, keep using last known values
-      // Don't log in production to avoid spam
+      // Fail silently
     } finally {
       this.isPolling = false;
     }
   }
 
   /**
-   * Check if resources have changed significantly.
-   * Avoids unnecessary re-renders.
+   * Check if resources have changed significantly to avoid spamming UI re-renders.
    */
-  private hasChanged(newResources: SystemResources): boolean {
-    const threshold = 0.5; // 0.5% change threshold
+  private hasChanged(newGlobal: GlobalResources): boolean {
+    const threshold = 0.5; // 0.5% change threshold for CPU
 
-    const cpuChanged = Math.abs(newResources.cpuUsage - this.latestResources.cpuUsage) > threshold;
-    const memChanged = Math.abs(newResources.usedMemory - this.latestResources.usedMemory) > 10; // 10MB
+    const cpuChanged =
+      Math.abs(newGlobal.system.cpuUsage - this.latestGlobal.system.cpuUsage) > threshold;
+    const memChanged =
+      Math.abs(newGlobal.system.usedMemory - this.latestGlobal.system.usedMemory) > 10; // 10MB
+
+    // If PIDs changed, we definitely want a redraw
+    if (newGlobal.processes.size !== this.latestGlobal.processes.size) {
+      return true;
+    }
 
     return cpuChanged || memChanged;
   }
@@ -138,12 +149,12 @@ export class AsyncResourceMonitor {
   /**
    * Notify all subscribers of resource changes.
    */
-  private notifySubscribers(resources: SystemResources): void {
+  private notifySubscribers(resources: GlobalResources): void {
     this.subscribers.forEach((callback) => {
       try {
         callback(resources);
       } catch (_error) {
-        // Ignore subscriber errors
+        // Ignore
       }
     });
   }

@@ -49,19 +49,19 @@ export class DockerExecutor {
     const envVars = this.getEnvVars(config);
 
     // Use process.cwd() as project directory to ensure consistent context
-    const projectDirFlag = `--project-directory "${process.cwd()}"`;
+    const escapedProjectDir = `"${process.cwd().replace(/"/g, '\\"')}"`;
+    const escapedComposeFile = `"${composeFilePath.replace(/"/g, '\\"')}"`;
+    const projectDirFlag = `--project-directory ${escapedProjectDir}`;
 
     // 1. Start containers in detached mode (Sync)
-    // This allows them to run in background even if the log viewer stops
     const upCommand =
-      `${this.composeCommand} ${projectDirFlag} -f ${composeFilePath} ${profiles} up -d ${services}`.trim();
+      `${this.composeCommand} ${projectDirFlag} -f ${escapedComposeFile} ${profiles} up -d ${services}`.trim();
 
     try {
-      // Execute up -d synchronously using proper env vars
       execSync(upCommand, {
         cwd,
         env: envVars,
-        stdio: 'pipe', // Capture output to avoid polluting stdout
+        stdio: 'pipe',
       });
     } catch (error) {
       throw new Error(
@@ -70,9 +70,8 @@ export class DockerExecutor {
     }
 
     // 2. Spawn logs -f as the long-running process
-    // This solves the 'STOPPED' status issue, as logs -f keeps running
     const logsCommand =
-      `${this.composeCommand} ${projectDirFlag} -f ${composeFilePath} logs -f ${services}`.trim();
+      `${this.composeCommand} ${projectDirFlag} -f ${escapedComposeFile} logs -f ${services}`.trim();
 
     return this.processManager.spawn({
       id,
@@ -82,17 +81,16 @@ export class DockerExecutor {
       logFile: join(process.cwd(), 'tmp', 'logs', `${id}.log`),
       detached: options?.detached,
       onStop: async () => {
-        // Stop containers when the log process is killed (Interactive Mode fallback)
         try {
           const stopCommand =
-            `${this.composeCommand} ${projectDirFlag} -f ${composeFilePath} stop ${services}`.trim();
+            `${this.composeCommand} ${projectDirFlag} -f ${escapedComposeFile} stop ${services}`.trim();
           execSync(stopCommand, {
             cwd,
             env: envVars,
-            stdio: 'ignore', // Suppress output
+            stdio: 'ignore',
           });
         } catch (_error) {
-          // Ignore errors during shutdown
+          // Ignore errors
         }
       },
     });
@@ -100,22 +98,19 @@ export class DockerExecutor {
 
   /**
    * Stop a running Docker Compose service
-   *
-   * @param id - Module identifier
-   * @param config - Docker module configuration (needed for compose file and services)
-   * @returns Promise resolving to process result
    */
   async stop(id: string, config: DockerModule): Promise<ProcessResult> {
-    // Explicitly run stop command (Daemon Mode support)
     const composeFilePath = resolve(config.composeFile);
     const cwd = dirname(composeFilePath);
     const services = config.services?.join(' ') ?? '';
     const envVars = this.getEnvVars(config);
-    const projectDirFlag = `--project-directory "${process.cwd()}"`;
 
     try {
+      const escapedProjectDir = `"${process.cwd().replace(/"/g, '\\"')}"`;
+      const escapedComposeFile = `"${composeFilePath.replace(/"/g, '\\"')}"`;
+      const projectDirFlag = `--project-directory ${escapedProjectDir}`;
       const stopCommand =
-        `${this.composeCommand} ${projectDirFlag} -f ${composeFilePath} stop ${services}`.trim();
+        `${this.composeCommand} ${projectDirFlag} -f ${escapedComposeFile} stop ${services}`.trim();
       execSync(stopCommand, {
         cwd,
         env: envVars,

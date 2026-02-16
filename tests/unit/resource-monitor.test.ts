@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
-import { AsyncResourceMonitor } from '../../src/cli/lib/resource-monitor';
-import type { SystemResources } from '../../src/utils/resources';
+import { AsyncResourceMonitor } from '../../src/cli/lib/resource-monitor.js';
+import type { GlobalResources } from '../../src/utils/resources/index.js';
 
 describe('AsyncResourceMonitor', () => {
   let monitor: AsyncResourceMonitor;
@@ -20,18 +20,16 @@ describe('AsyncResourceMonitor', () => {
       const resources = monitor.getLatestResources();
 
       expect(resources).toBeDefined();
-      expect(resources.totalMemory).toBeGreaterThanOrEqual(0);
-      expect(resources.usedMemory).toBeGreaterThanOrEqual(0);
-      expect(resources.freeMemory).toBeGreaterThanOrEqual(0);
-      expect(resources.cpuCount).toBeGreaterThanOrEqual(1);
-      expect(resources.cpuUsage).toBeGreaterThanOrEqual(0);
+      expect(resources.system.totalMemory).toBeGreaterThanOrEqual(0);
+      expect(resources.system.usedMemory).toBeGreaterThanOrEqual(0);
+      expect(resources.system.freeMemory).toBeGreaterThanOrEqual(0);
+      expect(resources.system.cpuCount).toBeGreaterThanOrEqual(1);
+      expect(resources.system.cpuUsage).toBeGreaterThanOrEqual(0);
     });
 
     test('should accept custom configuration', () => {
       const customMonitor = new AsyncResourceMonitor({
         updateInterval: 500,
-        enableCPU: false,
-        enableMemory: true,
       });
 
       expect(customMonitor).toBeDefined();
@@ -54,7 +52,9 @@ describe('AsyncResourceMonitor', () => {
       const resources2 = monitor.getLatestResources();
 
       expect(resources1).not.toBe(resources2); // Different objects
-      expect(resources1).toEqual(resources2); // Same values
+      
+      // Compare values (excluding Map which might need special equality check or iteration)
+      expect(resources1.system).toEqual(resources2.system);
     });
   });
 
@@ -91,7 +91,7 @@ describe('AsyncResourceMonitor', () => {
   describe('subscribe', () => {
     test('should immediately call subscriber with current data', () => {
       let callCount = 0;
-      let receivedResources: SystemResources | null = null;
+      let receivedResources: GlobalResources | null = null;
 
       monitor.subscribe((resources) => {
         callCount++;
@@ -103,7 +103,7 @@ describe('AsyncResourceMonitor', () => {
     });
 
     test('should notify subscribers on updates', async () => {
-      const updates: SystemResources[] = [];
+      const updates: GlobalResources[] = [];
 
       monitor.subscribe((resources) => {
         updates.push(resources);
@@ -175,7 +175,7 @@ describe('AsyncResourceMonitor', () => {
 
   describe('change detection', () => {
     test('should only notify when resources actually change', async () => {
-      const updates: SystemResources[] = [];
+      const updates: GlobalResources[] = [];
 
       monitor.subscribe((resources) => {
         updates.push(resources);
@@ -198,11 +198,10 @@ describe('AsyncResourceMonitor', () => {
       const resources = monitor.getLatestResources();
 
       // Basic sanity checks
-      expect(resources.cpuCount).toBeGreaterThan(0);
-      // totalMemory might be 0 initially or on some platforms, so check it's defined
-      expect(resources.totalMemory).toBeGreaterThanOrEqual(0);
-      expect(resources.cpuUsage).toBeGreaterThanOrEqual(0);
-      expect(resources.cpuUsage).toBeLessThanOrEqual(100);
+      expect(resources.system.cpuCount).toBeGreaterThan(0);
+      expect(resources.system.totalMemory).toBeGreaterThanOrEqual(0);
+      expect(resources.system.cpuUsage).toBeGreaterThanOrEqual(0);
+      expect(resources.system.cpuUsage).toBeLessThanOrEqual(100);
     });
   });
 

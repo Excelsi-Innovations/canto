@@ -1,73 +1,108 @@
-/**
- * Async resource monitoring with caching
- * Main entry point for system resource monitoring
- */
-
 import { platform } from 'os';
-import { TTLCache } from './cache.js';
-import * as windows from './platform/windows.js';
-import * as darwin from './platform/darwin.js';
-import * as linux from './platform/linux.js';
+import type { GlobalResources, ProcessResources, SystemResources } from './types.js';
+import {
+  getWindowsGlobalResources,
+  getWindowsProcessResources,
+  getWindowsSystemResources,
+} from './platform/windows.js';
+import { getDarwinProcessResources, getDarwinSystemResources } from './platform/darwin.js';
+import { getLinuxProcessResources, getLinuxSystemResources } from './platform/linux.js';
+
+export * from './types.js';
 
 /**
- * System resource information
+ * Get both system and process-specific resources in a single optimized call.
  */
-export interface SystemResources {
-  totalMemory: number; // Total RAM in MB
-  usedMemory: number; // Used RAM in MB
-  freeMemory: number; // Free RAM in MB
-  cpuCount: number; // Number of CPU cores
-  cpuUsage: number; // Overall CPU usage percentage
-}
-
-// Cache with 2-second TTL to match dashboard update interval
-const resourceCache = new TTLCache<SystemResources>(2000);
-
-/**
- * Get system resources asynchronously with caching
- * Returns cached data if available and fresh (< 2s old)
- * Otherwise fetches new data and caches it
- */
-export async function getSystemResources(): Promise<SystemResources> {
-  // Check cache first
-  const cached = resourceCache.get('system');
-  if (cached) {
-    return cached;
-  }
-
-  // Fetch new data based on platform
-  let resources: SystemResources;
+export async function getGlobalResources(pids: number[]): Promise<GlobalResources> {
   const os = platform();
 
   if (os === 'win32') {
-    resources = await windows.getResourceStats();
-  } else if (os === 'darwin') {
-    resources = await darwin.getResourceStats();
-  } else {
-    resources = await linux.getResourceStats();
+    return getWindowsGlobalResources(pids);
   }
 
-  // Cache the result
-  resourceCache.set('system', resources);
+  // Fallback for Unix/MacOS
+  const [system, ...procResults] = await Promise.all([
+    getSystemResources(),
+    ...pids.map((pid) => getProcessResources(pid)),
+  ]);
 
-  return resources;
+  const processes = new Map<number, ProcessResources>();
+  procResults.forEach((res) => {
+    if (res) processes.set(res.pid, res);
+  });
+
+  return { system, processes };
 }
 
 /**
- * Clear the resource cache
- * Useful for testing or forcing fresh data
+ * Get system-wide resource information
  */
-export function clearResourceCache(): void {
-  resourceCache.clear();
+export async function getSystemResources(): Promise<SystemResources> {
+  const os = platform();
+  try {
+    if (os === 'win32') {
+      return await getWindowsSystemResources();
+    }
+    if (os === 'darwin') {
+      return await getDarwinSystemResources();
+    }
+    return await getLinuxSystemResources();
+  } catch {
+    return {
+      totalMemory: 0,
+      usedMemory: 0,
+      freeMemory: 0,
+      cpuCount: 1,
+      cpuUsage: 0,
+    };
+  }
 }
 
 /**
  * Get resource usage for a specific process by PID
- * Note: This function is still synchronous and uses the old implementation
- * TODO: Implement async version in future iteration
  */
-export function getProcessResources(_pid: number): null {
-  // Placeholder - process-specific monitoring not yet implemented in async version
-  // The dashboard doesn't currently use this function
-  return null;
+export async function getProcessResources(pid: number): Promise<ProcessResources | null> {
+  const os = platform();
+  try {
+    if (os === 'win32') {
+      return await getWindowsProcessResources(pid);
+    }
+    if (os === 'darwin') {
+      return await getDarwinProcessResources(pid);
+    }
+    return await getLinuxProcessResources(pid);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Create a simple ASCII bar chart
+ */
+export function createBar(value: number, max: number, width: number = 20): string {
+  const percentage = Math.min((value / max) * 100, 100);
+  const filledWidth = Math.round((percentage / 100) * width);
+  const emptyWidth = width - filledWidth;
+
+  const filled = '█'.repeat(filledWidth);
+  const empty = '░'.repeat(emptyWidth);
+
+  return `${filled}${empty}`;
+}
+
+/**
+ * Format bytes to human-readable string
+ */
+export function formatMemory(mb: number): string {
+  if (mb < 1024) {
+    return `${mb.toFixed(1)} MB`;
+  }
+  return `${(mb / 1024).toFixed(2)} GB`;
+}
+
+/**
+ * Format CPU percentage
+ */
+export function formatCPU(cpu: number): string {
+  return `${cpu.toFixed(1)}%`;
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import { createBar, formatCPU, type SystemResources } from '../../../utils/resources.js';
+import { createBar, formatCPU, type SystemResources } from '../../../utils/resources/index.js';
 import type { ResourceHistory } from '../../lib/resource-history.js';
 import type { Theme } from '../../../utils/preferences.js';
 import { VERSION } from '../../../version.js';
@@ -79,18 +79,18 @@ export const ModernHeader: React.FC<ModernHeaderProps> = React.memo(
         />
 
         {/* System Stats Row 1: CPU */}
-        <Box marginBottom={0} flexDirection="row">
-          <Box flexBasis={6} flexShrink={0}>
+        <Box marginBottom={0} flexDirection="row" alignItems="center">
+          <Box width={6} flexShrink={0}>
             <Text bold color={theme.colors.warning}>
               CPU
             </Text>
           </Box>
           <Text color={theme.colors.muted}>│ </Text>
-          <Box flexBasis={22} flexShrink={0}>
+          <Box width={22} flexShrink={0}>
             <Text color={theme.colors.info}>{cpuBar}</Text>
           </Box>
           <Text> </Text>
-          <Box flexBasis={8} flexShrink={0}>
+          <Box width={8} flexShrink={0}>
             <Text color={theme.colors.primary}>{formatCPU(systemResources.cpuUsage)}</Text>
           </Box>
           <Text color={theme.colors.muted}> │ </Text>
@@ -102,29 +102,32 @@ export const ModernHeader: React.FC<ModernHeaderProps> = React.memo(
         </Box>
 
         {/* System Stats Row 2: RAM */}
-        <Box flexDirection="row">
-          <Box flexBasis={6} flexShrink={0}>
+        <Box flexDirection="row" alignItems="center">
+          <Box width={6} flexShrink={0}>
             <Text bold color={theme.colors.warning}>
               RAM
             </Text>
           </Box>
           <Text color={theme.colors.muted}>│ </Text>
-          <Box flexBasis={22} flexShrink={0}>
+          <Box width={22} flexShrink={0}>
             <Text color={theme.colors.success}>{memoryBar}</Text>
           </Box>
           <Text> </Text>
-          <Box flexBasis={8} flexShrink={0}>
+          <Box width={8} flexShrink={0}>
             <Text color={theme.colors.primary}>{memPercent}</Text>
           </Box>
           <Text color={theme.colors.muted}> │ </Text>
-          <Box flexGrow={1} flexDirection="row" overflow="hidden" minWidth={0}>
-            <Text color={theme.colors.muted} wrap="truncate-end">
-              {memoryBraille}
-            </Text>
-            <Text dimColor color={theme.colors.muted} wrap="truncate-end">
-              {' '}
-              {memLabel}
-            </Text>
+          <Box flexGrow={1} flexDirection="row" overflow="hidden" minWidth={0} alignItems="center">
+            <Box flexGrow={1} minWidth={0} overflow="hidden">
+              <Text color={theme.colors.muted} wrap="truncate-end">
+                {memoryBraille}
+              </Text>
+            </Box>
+            <Box flexShrink={0} marginLeft={1}>
+              <Text dimColor color={theme.colors.muted}>
+                {memLabel}
+              </Text>
+            </Box>
           </Box>
         </Box>
       </Box>

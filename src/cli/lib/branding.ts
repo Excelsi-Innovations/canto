@@ -66,18 +66,17 @@ export function getCurrentQuote(): string {
 }
 
 // -------------------------------------------------------------------
-// Poetic feedback messages — the "voice" of the maestro
+// Status messages
 // -------------------------------------------------------------------
 
 /**
  * Loading messages (shown during initialization)
  */
 export const LOADING_MESSAGES = [
-  'Summoning the heteronyms...',
-  'Tuning the instruments...',
-  'Reading the score...',
-  'Gathering the ensemble...',
-  'Opening the curtain...',
+  'Initializing Canto...',
+  'Loading configuration...',
+  'Checking system resources...',
+  'Preparing workspace...',
 ];
 
 /**
@@ -89,43 +88,43 @@ export function getLoadingMessage(): string {
 }
 
 /**
- * Poetic action messages by module type
+ * Action messages by module type
  */
 export const POETIC_MESSAGES: Record<string, Record<string, string>> = {
   start: {
-    docker: 'Summoning Docker services...',
-    workspace: 'Composing the workspace...',
-    script: 'Invoking the script...',
-    service: 'Awakening the service...',
-    default: 'Bringing the voice to life...',
+    docker: 'Starting Docker services...',
+    workspace: 'Starting workspace module...',
+    script: 'Executing script...',
+    service: 'Starting service...',
+    default: 'Starting module...',
   },
   stop: {
-    docker: 'Silencing the containers...',
-    workspace: 'Resting the workspace...',
-    script: 'Hushing the script...',
-    service: 'Putting the service to sleep...',
-    default: 'The voice fades to silence...',
+    docker: 'Stopping Docker services...',
+    workspace: 'Stopping workspace module...',
+    script: 'Stopping script...',
+    service: 'Stopping service...',
+    default: 'Stopping module...',
   },
   restart: {
-    docker: 'Retuning the containers...',
-    workspace: 'Reshaping the workspace...',
-    script: 'Replaying the script...',
-    service: 'Refreshing the service...',
-    default: 'The voice finds a new key...',
+    docker: 'Restarting Docker services...',
+    workspace: 'Restarting workspace module...',
+    script: 'Restarting script...',
+    service: 'Restarting service...',
+    default: 'Restarting module...',
   },
   error: {
-    docker: 'A container lost its melody...',
-    workspace: 'The workspace struck a sour note...',
-    script: 'The script missed its cue...',
-    service: 'The service fell out of rhythm...',
-    default: 'A voice went silent unexpectedly...',
+    docker: 'Docker service unreachable or failed',
+    workspace: 'Workspace module failed',
+    script: 'Script execution failed',
+    service: 'Service failed',
+    default: 'Module failed unexpectedly',
   },
   autoRestart: {
-    docker: 'Coaxing the container back to the stage...',
-    workspace: 'Retuning the workspace...',
-    script: 'The script picks up where it left off...',
-    service: 'The service returns from intermission...',
-    default: 'The maestro calls the voice back...',
+    docker: 'Auto-restarting Docker service...',
+    workspace: 'Auto-restarting workspace...',
+    script: 'Auto-restarting script...',
+    service: 'Auto-restarting service...',
+    default: 'Auto-restarting module...',
   },
 };
 

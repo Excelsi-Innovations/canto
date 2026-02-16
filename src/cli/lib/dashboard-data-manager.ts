@@ -7,7 +7,7 @@ import type { ModuleOrchestrator } from '../../modules/index.js';
 import type { DockerExecutor } from '../../modules/docker.js';
 import type { ModuleStatus } from '../types.js';
 import { isDockerRunning } from '../../utils/docker.js';
-import { getProcessResources } from '../../utils/resources.js';
+// Removed batched process resources from here - moved to AsyncResourceMonitor
 
 export type ModuleStatusSubscriber = (modules: ModuleStatus[]) => void;
 
@@ -318,14 +318,8 @@ export class DashboardDataManager {
         startedAt: processInfo?.startedAt,
       };
 
-      // Get process resources if we have a PID
-      if (pid) {
-        const resources = await getProcessResources(pid);
-        if (resources) {
-          moduleStatus.cpu = resources.cpu;
-          moduleStatus.memory = resources.memory;
-        }
-      }
+      // Process resources are now handled by AsyncResourceMonitor in a batched way.
+      // This eliminates the 12+ PowerShell process spawns per cycle.
 
       // Get Docker containers if it's a Docker module
       if (module.type === 'docker') {

@@ -37,6 +37,7 @@ export class PrismaDriver implements IMigrationDriver {
   }
 
   async detect(cwd: string): Promise<boolean> {
+    this.projectRoot = null; // Reset for each call
     // 1. Check root
     if (this.checkPath(join(cwd, 'prisma', 'schema.prisma'), cwd)) return true;
     if (this.checkPath(join(cwd, 'schema.prisma'), cwd)) return true;

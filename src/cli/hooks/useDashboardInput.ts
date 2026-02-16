@@ -240,11 +240,23 @@ export function useDashboardInput({
         } else if (key.shift && input === 'R') {
           handleBulkAction('restart');
         } else if (input === '1' || input === 's') {
-          handleModuleAction('start');
+          if (selectedModules.size > 0) {
+            handleBulkAction('start');
+          } else {
+            handleModuleAction('start');
+          }
         } else if (input === '2' || input === 'x') {
-          handleModuleAction('stop');
+          if (selectedModules.size > 0) {
+            handleBulkAction('stop');
+          } else {
+            handleModuleAction('stop');
+          }
         } else if (input === '3' || input === 'r') {
-          handleModuleAction('restart');
+          if (selectedModules.size > 0) {
+            handleBulkAction('restart');
+          } else {
+            handleModuleAction('restart');
+          }
         } else if (input === 'f' || input === 'F') {
           const module = sortedModules[selectedModule];
           if (module) {

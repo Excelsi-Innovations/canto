@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { ModuleStatus } from '../../types.js';
-import { formatMemory, formatCPU } from '../../../utils/resources.js';
+import { formatMemory, formatCPU } from '../../../utils/resources/index.js';
 import type { ModuleRestartState } from '../../lib/auto-restart-manager.js';
 import type { Theme } from '../../../utils/preferences.js';
 import { getModuleIcon } from '../../lib/icons.js';

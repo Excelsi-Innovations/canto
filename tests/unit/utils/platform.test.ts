@@ -15,26 +15,27 @@ import {
 import { execSync } from 'node:child_process';
 import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 
-// Mock node:child_process to prevent actual command execution
+// Mock node:child_process safely
 mock.module('node:child_process', () => ({
   execSync: mock(),
+  exec: mock(),
+  spawn: mock(),
 }));
 
 describe('platform utilities', () => {
   const originalPlatform = process.platform;
-  const originalEnv = process.env;
+  const originalEnv = { ...process.env };
 
   beforeEach(() => {
-    // Reset mocks before each test
     (execSync as any).mockClear();
-    // jest.resetModules() is not needed as the module is stateless and we are mocking process manually
   });
 
   afterEach(() => {
     Object.defineProperty(process, 'platform', {
       value: originalPlatform,
+      configurable: true,
     });
-    process.env = originalEnv;
+    process.env = { ...originalEnv };
   });
 
   it('should detect Windows platform', () => {

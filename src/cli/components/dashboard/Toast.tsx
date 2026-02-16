@@ -22,11 +22,13 @@ export const Toast: React.FC<ToastProps> = ({ toast }) => {
   const { color, icon, border } = config[toast.type];
 
   return (
-    <Box borderStyle="round" borderColor={border} paddingX={1}>
+    <Box borderStyle="round" borderColor={border} paddingX={1} flexShrink={1} minWidth={0}>
       <Text color={color} bold>
         {icon}
       </Text>
-      <Text> {toast.message}</Text>
+      <Box marginLeft={1} flexShrink={1} minWidth={0}>
+        <Text wrap="wrap">{toast.message}</Text>
+      </Box>
     </Box>
   );
 };

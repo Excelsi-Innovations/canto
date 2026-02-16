@@ -96,15 +96,16 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
           </Box>
 
           {/* Type - flexible width */}
-          <Box flexBasis={12} flexShrink={0} marginLeft={1} overflow="hidden">
+          <Box width={12} flexShrink={1} marginLeft={1} overflow="hidden">
             <Text wrap="truncate-end" color="gray">
               {module.type}
             </Text>
           </Box>
 
           {/* Status Text - explicit state */}
-          <Box flexBasis={12} flexShrink={0} marginLeft={1} overflow="hidden">
+          <Box width={12} flexShrink={1} marginLeft={1} overflow="hidden">
             <Text
+              wrap="truncate-end"
               color={
                 module.status === 'RUNNING'
                   ? 'green'
@@ -117,13 +118,17 @@ export const ModuleRow: React.FC<ModuleRowProps> = React.memo(
             </Text>
           </Box>
 
-          {/* Badges/Alerts - flexible width */}
-          <Box flexBasis={18} flexShrink={0} justifyContent="flex-end" overflow="hidden">
-            {alert && <Text color={getAlertColor(alert.level)}> {getAlertIcon(alert.level)}</Text>}
-            {autoRestartInfo && !autoRestartInfo.isRestarting && (
-              <Text color="cyan"> 🔄{autoRestartInfo.secondsRemaining}s</Text>
-            )}
-            {autoRestartInfo?.isRestarting && <Text color="yellow"> ⟳</Text>}
+          {/* Badges/Alerts - flexible width, shrinks first */}
+          <Box width={18} flexShrink={2} justifyContent="flex-end" overflow="hidden" minWidth={0}>
+            <Text wrap="truncate-end">
+              {alert && (
+                <Text color={getAlertColor(alert.level)}> {getAlertIcon(alert.level)}</Text>
+              )}
+              {autoRestartInfo && !autoRestartInfo.isRestarting && (
+                <Text color="cyan"> 🔄{autoRestartInfo.secondsRemaining}s</Text>
+              )}
+              {autoRestartInfo?.isRestarting && <Text color="yellow"> ⟳</Text>}
+            </Text>
           </Box>
         </Box>
       </Box>

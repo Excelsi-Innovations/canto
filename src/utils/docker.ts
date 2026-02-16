@@ -111,15 +111,15 @@ export function listContainers(composeFilePath: string, projectRoot?: string): D
     const cwd = dirname(composeFilePath);
 
     // Get project name from docker-compose.yml
-    const projectDirFlag = projectRoot ? `--project-directory ${projectRoot}` : '';
-    const projectName = execSync(
-      `docker compose -f ${composeFilePath} ${projectDirFlag} config --format json`,
-      {
-        cwd,
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'ignore'],
-      }
-    );
+    const escapedProjectRoot = projectRoot ? `"${projectRoot.replace(/"/g, '\\"')}"` : '';
+    const projectDirFlag = projectRoot ? `--project-directory ${escapedProjectRoot}` : '';
+    const projectCommand = `docker compose -f "${composeFilePath.replace(/"/g, '\\"')}" ${projectDirFlag} config --format json`;
+
+    const projectName = execSync(projectCommand, {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    });
 
     let project = 'default';
     try {
@@ -133,7 +133,12 @@ export function listContainers(composeFilePath: string, projectRoot?: string): D
     // List containers using docker ps with project label filter
     const output = execSync(
       `docker ps -a --filter "label=com.docker.compose.project=${project}" --format "{{.ID}}|{{.Names}}|{{.Status}}|{{.Image}}|{{.Ports}}|{{.CreatedAt}}"`,
-      { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
+      {
+        cwd,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'ignore'],
+        windowsHide: true,
+      }
     );
 
     if (!output.trim()) {

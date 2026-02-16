@@ -11,7 +11,7 @@ import { ScreenRouter } from '../components/dashboard/ScreenRouter.js';
 import { SplashScreen } from '../components/dashboard/SplashScreen.js';
 import { useDashboardData } from '../hooks/useDashboardData.js';
 import { useDashboardInput } from '../hooks/useDashboardInput.js';
-import { createBar } from '../../utils/resources.js';
+import { createBar } from '../../utils/resources/index.js';
 import { ModuleDetailsPane } from '../components/dashboard/ModuleDetailsPane.js';
 
 import { ProcessManager } from '../../processes/manager.js';
@@ -21,7 +21,7 @@ const DashboardContent: React.FC = () => {
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [selectedModule, setSelectedModule] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
-  const VISIBLE_ROWS = 8;
+  const VISIBLE_ROWS = 6;
 
   // Scroll Handling
   useEffect(() => {
@@ -131,6 +131,15 @@ const DashboardContent: React.FC = () => {
   // Render sub-screens (help, env, logs, history, details)
   // ScreenRouter returns null for 'dashboard' and 'modules' screens,
   // which are rendered directly in this component below
+  // Synchronized Output Hook
+  useEffect(() => {
+    // Enable synchronized output mode to prevent tearing
+    process.stdout.write('\x1b[?2026h');
+    return () => {
+      // Flush the buffer
+      process.stdout.write('\x1b[?2026l');
+    };
+  }); // Run on every render to flush the buffer
   const subScreen = (
     <ScreenRouter
       screen={screen}
@@ -491,6 +500,8 @@ export async function dashboardCommand(): Promise<void> {
   process.stdout.write('\x1b[?1049h');
   // Hide cursor
   process.stdout.write('\x1b[?25l');
+  // Enable synchronized updates (if supported)
+  process.stdout.write('\x1b[?2026h');
 
   let cleanupCalled = false;
   const cleanup = async () => {
@@ -504,6 +515,8 @@ export async function dashboardCommand(): Promise<void> {
       // ignore
     }
 
+    // Disable synchronized updates
+    process.stdout.write('\x1b[?2026l');
     // Show cursor
     process.stdout.write('\x1b[?25h');
     // Leave alternate screen buffer

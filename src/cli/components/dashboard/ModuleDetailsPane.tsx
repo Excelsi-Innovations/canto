@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ModuleStatus } from '../../types.js';
-import { formatMemory, createBar } from '../../../utils/resources.js';
+import { formatMemory, createBar } from '../../../utils/resources/index.js';
 import type { Theme } from '../../../utils/preferences.js';
 
 interface ModuleDetailsPaneProps {
@@ -17,7 +17,7 @@ export const ModuleDetailsPane: React.FC<ModuleDetailsPaneProps> = React.memo(
           borderStyle="round"
           borderColor={theme.colors.border}
           paddingX={1}
-          height={6} // Fixed height to prevent resizing flicker
+          height={8} // Fixed height to prevent resizing flicker
           marginBottom={1}
           flexDirection="column"
           justifyContent="center"
@@ -36,7 +36,7 @@ export const ModuleDetailsPane: React.FC<ModuleDetailsPaneProps> = React.memo(
         borderStyle="round"
         borderColor={theme.colors.border}
         paddingX={1}
-        minHeight={5} // Minimum height
+        height={8} // Fixed height for consistency
         flexGrow={0}
         marginBottom={1}
         flexDirection="column"

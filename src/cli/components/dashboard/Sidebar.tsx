@@ -29,7 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     return (
       <Box
         flexDirection="column"
-        flexBasis={32}
+        flexBasis={28}
         flexShrink={0}
         borderStyle="round"
         borderColor={theme.colors.border}

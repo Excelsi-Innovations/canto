@@ -11,7 +11,7 @@ import { checkResourceAlerts, type ResourceAlert } from '../lib/resource-alerts.
 import { AutoRestartManager } from '../lib/auto-restart-manager.js';
 import { getPreferencesManager } from '../../utils/preferences-manager.js';
 import { getPoeticMessage } from '../lib/branding.js';
-import { formatMemory, type SystemResources } from '../../utils/resources.js';
+import { formatMemory, type SystemResources } from '../../utils/resources/index.js';
 import type { ModuleStatus } from '../types.js';
 import type { ToastData } from '../components/dashboard/Toast.js';
 import { THEMES, type Theme } from '../../utils/preferences.js';
@@ -125,10 +125,18 @@ export function useDashboardData() {
     initializeData();
 
     const unsubscribe = dataManager.subscribe((moduleStatuses) => {
-      setModules(moduleStatuses);
+      // Merge in latest resource metrics before updating state
+      const resources = resourceMonitor.getLatestResources();
+      const mergedModules = moduleStatuses.map((m) => {
+        if (!m.pid) return m;
+        const res = resources.processes.get(m.pid);
+        return res ? { ...m, cpu: res.cpu, memory: res.memory } : m;
+      });
+
+      setModules(mergedModules);
 
       const newAlerts: ResourceAlert[] = [];
-      moduleStatuses.forEach((module) => {
+      mergedModules.forEach((module) => {
         const alerts = checkResourceAlerts(module);
         newAlerts.push(...alerts);
       });
@@ -160,16 +168,33 @@ export function useDashboardData() {
 
   // Resource Monitor
   useEffect(() => {
+    // Provide PIDs to monitor from current data manager state
+    resourceMonitor.setPIDProvider(() => {
+      return dataManager
+        .getModuleStatuses()
+        .map((m) => m.pid)
+        .filter((pid): pid is number => !!pid);
+    });
+
     resourceMonitor.start();
     const unsubscribe = resourceMonitor.subscribe((resources) => {
-      setSystemResources(resources);
-      resourceHistory.addDataPoint(resources.cpuUsage, resources.usedMemory);
+      setSystemResources(resources.system);
+      resourceHistory.addDataPoint(resources.system.cpuUsage, resources.system.usedMemory);
+
+      // Also trigger a module refresh to merge in these new metrics
+      const currentModules = dataManager.getModuleStatuses();
+      const mergedModules = currentModules.map((m) => {
+        if (!m.pid) return m;
+        const res = resources.processes.get(m.pid);
+        return res ? { ...m, cpu: res.cpu, memory: res.memory } : m;
+      });
+      setModules(mergedModules);
     });
     return () => {
       unsubscribe();
       resourceMonitor.stop();
     };
-  }, [resourceMonitor, resourceHistory]);
+  }, [resourceMonitor, resourceHistory, dataManager]);
 
   // Auto Restart Logic
   useEffect(() => {
@@ -265,7 +290,9 @@ export function useDashboardData() {
         triggerUpdate();
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        showToast(getPoeticMessage('error', moduleType), 'error');
+        const poeticPrefix = getPoeticMessage('error', moduleType);
+        // Combine poetic prefix with actual error for clarity
+        showToast(`${poeticPrefix}: ${errorMsg}`, 'error');
         setError(errorMsg);
         prefsManager.addToHistory(`${action} ${moduleName}`, moduleName, false);
       } finally {
