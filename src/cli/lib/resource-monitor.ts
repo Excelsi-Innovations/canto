@@ -115,8 +115,8 @@ export class AsyncResourceMonitor {
       const pids = this.pidProvider();
       const resources = await getGlobalResources(pids);
 
-      // Only update and notify if significant changes occurred
-      if (this.hasChanged(resources)) {
+      // Only update and notify if significant changes occurred and we are still running
+      if (this.updateTimer && this.hasChanged(resources)) {
         this.latestGlobal = resources;
         this.notifySubscribers(resources);
       }
