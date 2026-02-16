@@ -1,4 +1,4 @@
-import { exec, type ChildProcess } from 'child_process';
+import { exec, type ChildProcess } from 'node:child_process';
 import { type ProcessInfo } from '../types.js';
 import type { ProcessLogger } from '../logger.js';
 import { isWindows } from '../../utils/platform.js';

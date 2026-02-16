@@ -1,8 +1,8 @@
 import { mock } from 'bun:test';
 import { EventEmitter } from 'node:events';
 
-// Mock child_process.exec
-mock.module('child_process', () => ({
+// Mock node:child_process
+mock.module('node:child_process', () => ({
   exec: mock((cmd, cb) => {
     if (cb) cb(null, { stdout: '', stderr: '' });
   }),

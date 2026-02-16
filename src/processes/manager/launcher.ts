@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { ProcessStatus, type ProcessInfo, type SpawnOptions } from '../types.js';
 import type { ProcessLogger } from '../logger.js';
 

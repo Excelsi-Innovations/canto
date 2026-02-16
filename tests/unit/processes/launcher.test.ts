@@ -1,8 +1,8 @@
 import { mock } from 'bun:test';
 import { EventEmitter } from 'node:events';
 
-// Mock child_process BEFORE import
-mock.module('child_process', () => ({
+// Mock node:child_process BEFORE import
+mock.module('node:child_process', () => ({
   spawn: mock(() => {
     const cp = new EventEmitter() as any;
     cp.pid = 12345;
@@ -37,9 +37,6 @@ describe('spawnProcess', () => {
 
     const promise = spawnProcess(options, onUpdate, onOutput, getLogger);
     
-    // It should immediately update to starting
-    // Note: The second update (RUNNING) might happen synchronously in mock,
-    // so we check if it was called with STARTING at least once.
     expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ 
       status: ProcessStatus.STARTING 
     }));
@@ -60,6 +57,7 @@ describe('spawnProcess', () => {
     };
 
     const result = await spawnProcess(options, onUpdate, onOutput, getLogger);
+    expect(result.success).toBe(true);
     const mockCp = result.child as any;
     
     mockCp.stdout.emit('data', Buffer.from('hello from stdout'));
@@ -76,6 +74,7 @@ describe('spawnProcess', () => {
     };
 
     const result = await spawnProcess(options, onUpdate, onOutput, getLogger);
+    expect(result.success).toBe(true);
     const mockCp = result.child as any;
     
     mockCp.emit('exit', 0, null);
@@ -93,6 +92,7 @@ describe('spawnProcess', () => {
     };
 
     const result = await spawnProcess(options, onUpdate, onOutput, getLogger);
+    expect(result.success).toBe(true);
     const mockCp = result.child as any;
     
     mockCp.emit('exit', 1, null);
